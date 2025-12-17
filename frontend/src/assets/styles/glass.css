@@ -1,0 +1,88 @@
+/* 玻璃卡片 - Apple Liquid Glass 风格 */
+.glass-card {
+  background: var(--glass-bg-light);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  transition: all var(--transition-base);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* 玻璃按钮 */
+.glass-button {
+  background: var(--glass-bg-light);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-900);
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.glass-button:active {
+  transform: scale(0.98);
+}
+
+/* 玻璃输入框 */
+.glass-input {
+  background: var(--glass-bg-light);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  outline: none;
+  transition: all var(--transition-fast);
+  font-size: var(--text-base);
+  width: 100%;
+  color: var(--color-gray-900);
+}
+
+.glass-input::placeholder {
+  color: var(--color-gray-500);
+}
+
+.glass-input:focus {
+  border-color: var(--color-pink-400);
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* 渐变背景 */
+.gradient-pink-blue {
+  background: linear-gradient(135deg, var(--color-pink-400) 0%, var(--color-blue-400) 100%);
+}
+
+.gradient-overlay {
+  position: relative;
+  overflow: hidden;
+}
+
+.gradient-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(255, 107, 157, 0.1) 0%, 
+    rgba(74, 144, 226, 0.1) 100%);
+  pointer-events: none;
+}

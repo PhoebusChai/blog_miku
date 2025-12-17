@@ -1,0 +1,78 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "MIKU.moc3",
+		"Textures": [
+			"MIKU.4096/texture_00.png"
+		],
+		"Physics": "MIKU.physics3.json",
+		"DisplayInfo": "MIKU.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "Chijing",
+				"File": "Expression/Chijing.exp3.json"
+			},
+			{
+				"Name": "Dazhihui",
+				"File": "Expression/Dazhihui.exp3.json"
+			},
+			{
+				"Name": "Mimiyan",
+				"File": "Expression/Mimiyan.exp3.json"
+			},
+			{
+				"Name": "Saihong",
+				"File": "Expression/Saihong.exp3.json"
+			},
+			{
+				"Name": "Yanjing",
+				"File": "Expression/Yanjing.exp3.json"
+			},
+			{
+				"Name": "liuhan",
+				"File": "Expression/liuhan.exp3.json"
+			}
+		],
+		"Motions": {
+			"Idle": [
+				{
+					"File": "Expression/02_Happy.motion3.json"
+				},
+				{
+					"File": "Expression/04_Happy.motion3.json"
+				}
+			],
+			"Walking": [
+				{
+					"File": "Expression/08_Walking.motion3.json"
+				}
+			],
+			"TapBody": [
+				{
+					"File": "Expression/03_Love.motion3.json"
+				},
+				{
+					"File": "Expression/11_Acting.motion3.json"
+				}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		}
+	],
+	"HitAreas": [
+		{
+			"Name": "Body",
+			"Id": "HitArea"
+		}
+	]
+}

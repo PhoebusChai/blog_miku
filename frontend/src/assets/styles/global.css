@@ -1,0 +1,65 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--color-gray-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Firefox 隐藏滚动条 */
+* {
+  scrollbar-width: none;
+}
+
+/* IE 隐藏滚动条 */
+body {
+  -ms-overflow-style: none;
+}
+
+/* 选中文本样式 */
+::selection {
+  background: rgba(255, 107, 157, 0.2);
+  color: var(--color-gray-900);
+}
+
+::-moz-selection {
+  background: rgba(255, 107, 157, 0.2);
+  color: var(--color-gray-900);
+}
