@@ -1279,20 +1279,24 @@ onUnmounted(() => {
 .comment-items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .comment-item-small {
-  padding: 10px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid var(--color-gray-200);
+  padding: 12px 10px;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--color-gray-200);
   transition: all var(--transition-fast);
 }
 
+.comment-item-small:last-child {
+  border-bottom: none;
+}
+
 .comment-item-small:hover {
-  border-color: var(--color-miku-300);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: var(--color-miku-50);
 }
 
 .comment-header-small {
@@ -1377,17 +1381,24 @@ onUnmounted(() => {
 .comment-item {
   display: flex;
   gap: 16px;
-  padding: 20px;
-  background: var(--color-gray-50);
-  border: 1px solid var(--color-gray-200);
-  border-radius: 8px;
+  padding: 20px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-gray-200);
+  border-radius: 0;
   transition: all var(--transition-fast);
 }
 
+.comment-item:last-child {
+  border-bottom: none;
+}
+
 .comment-item:hover {
-  background: white;
-  border-color: var(--color-miku-200);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: var(--color-miku-50);
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
 }
 
 .comment-avatar {

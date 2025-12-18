@@ -19,6 +19,18 @@
           <Archive :size="18" />
           <span>归档</span>
         </RouterLink>
+        <RouterLink to="/gallery" class="nav-link">
+          <Image :size="18" />
+          <span>相册</span>
+        </RouterLink>
+        <RouterLink to="/projects" class="nav-link">
+          <FolderGit2 :size="18" />
+          <span>项目</span>
+        </RouterLink>
+        <RouterLink to="/guestbook" class="nav-link">
+          <MessageSquare :size="18" />
+          <span>留言</span>
+        </RouterLink>
         <RouterLink to="/about" class="nav-link">
           <User :size="18" />
           <span>关于</span>
@@ -31,7 +43,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Sparkles, Home, Archive, User } from 'lucide-vue-next'
+import { Sparkles, Home, Archive, Image, FolderGit2, MessageSquare, User } from 'lucide-vue-next'
 
 const isScrolled = ref(false)
 

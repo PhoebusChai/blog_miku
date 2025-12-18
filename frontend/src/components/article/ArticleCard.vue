@@ -11,10 +11,6 @@
       <div class="article-card__footer">
         <div class="article-card__meta">
           <span class="meta-item">
-            <User :size="14" />
-            {{ article.author }}
-          </span>
-          <span class="meta-item">
             <Calendar :size="14" />
             {{ formatDate(article.createdAt) }}
           </span>
@@ -40,7 +36,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { User, Calendar, Eye, Heart } from 'lucide-vue-next'
+import { Calendar, Eye, Heart } from 'lucide-vue-next'
 import type { Article } from '@/types/article'
 
 interface Props {
