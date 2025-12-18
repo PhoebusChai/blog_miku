@@ -37,6 +37,31 @@ const router = createRouter({
       path: '/about',
       name: 'about',
       component: () => import('@/views/About.vue')
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/Register.vue')
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/Profile.vue')
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('@/views/Admin.vue')
+    },
+    {
+      path: '/error',
+      name: 'error',
+      component: () => import('@/views/Error.vue')
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFound.vue')
     }
   ]
 })

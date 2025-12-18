@@ -5,8 +5,11 @@
     <main class="about__main">
       <!-- 页面标题 -->
       <div class="about-header">
+        <div class="header-decoration">
+          <Sparkles :size="32" class="header-icon" />
+        </div>
         <h1 class="about-title">关于我</h1>
-        <p class="about-subtitle">Hello! 很高兴认识你 ✨</p>
+        <p class="about-subtitle">Hello! 很高兴认识你</p>
       </div>
 
       <!-- 主要内容区 -->
@@ -153,7 +156,7 @@ import {
   Code, MapPin, Github, Mail, 
   FileText, Eye, Heart, MessageCircle, 
   Calendar, Send, ArrowUp, Camera, Music, 
-  Book, Gamepad2, Plane
+  Book, Gamepad2, Plane, Sparkles
 } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
@@ -234,6 +237,21 @@ onUnmounted(() => {
   text-align: center;
   margin-bottom: var(--spacing-3xl);
   padding: var(--spacing-3xl) 0 var(--spacing-2xl);
+}
+
+.header-decoration {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-miku-100), var(--color-cyan-100));
+  border-radius: 50%;
+}
+
+.header-icon {
+  color: var(--color-miku-500);
 }
 
 .about-title {

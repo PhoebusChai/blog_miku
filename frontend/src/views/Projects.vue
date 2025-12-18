@@ -5,8 +5,38 @@
     <main class="projects__main">
       <!-- 页面标题 -->
       <div class="projects-header">
-        <h1 class="projects-title">项目</h1>
-        <p class="projects-subtitle">我的开源项目和作品集 🚀</p>
+        <div class="header-decoration">
+          <Rocket :size="32" class="header-icon" />
+        </div>
+        <h1 class="projects-title">我的项目</h1>
+        <p class="projects-subtitle">探索我的开源项目和作品集</p>
+        
+      </div>
+
+      <!-- 筛选和排序 -->
+      <div class="projects-filters">
+        <div class="filter-section">
+          <div class="filter-buttons">
+            <button 
+              v-for="filter in filters" 
+              :key="filter.value"
+              :class="['filter-btn', { 'is-active': activeFilter === filter.value }]"
+              @click="activeFilter = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+        </div>
+        <div class="sort-section">
+          <button
+            v-for="option in sortOptions"
+            :key="option.value"
+            :class="['sort-btn', { 'is-active': sortBy === option.value }]"
+            @click="sortBy = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
 
       <!-- 项目列表 -->
@@ -16,41 +46,64 @@
           <p>加载中...</p>
         </div>
         
-        <div v-else class="projects-grid">
+        <transition-group 
+          v-else 
+          name="project-list" 
+          tag="div" 
+          class="projects-list"
+        >
           <article
-            v-for="project in projects"
+            v-for="project in filteredProjects"
             :key="project.id"
-            class="project-card"
+            class="project-item"
           >
-            <div class="project-cover">
-              <img :src="project.cover" :alt="project.name" />
+            <div class="project-thumbnail">
+              <img :src="project.cover" :alt="project.name" loading="lazy" />
             </div>
-            <div class="project-content">
-              <h3 class="project-name">{{ project.name }}</h3>
-              <p class="project-desc">{{ project.description }}</p>
-              <div class="project-tags">
-                <span v-for="tag in project.tags" :key="tag" class="tag">
-                  {{ tag }}
-                </span>
-              </div>
-              <div class="project-footer">
-                <div class="project-stats">
-                  <span class="stat-item">
-                    <Star :size="14" />
-                    {{ project.stars }}
+            <div class="project-info">
+              <div class="project-main">
+                <div class="project-title-row">
+                  <h3 class="project-name">{{ project.name }}</h3>
+                  <span v-if="project.featured" class="featured-badge">
+                    <Sparkles :size="14" />
+                    精选
                   </span>
-                  <span class="stat-item">
-                    <GitFork :size="14" />
-                    {{ project.forks }}
+                </div>
+                <p class="project-desc">{{ project.description }}</p>
+                <div class="project-tags">
+                  <span v-for="tag in project.tags" :key="tag" class="tag">
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+              <div class="project-meta">
+                <div class="project-stats">
+                  <span class="stat-item" :title="`${project.stars} stars`">
+                    <Star :size="16" />
+                    {{ formatNumber(project.stars) }}
+                  </span>
+                  <span class="stat-item" :title="`${project.forks} forks`">
+                    <GitFork :size="16" />
+                    {{ formatNumber(project.forks) }}
+                  </span>
+                  <span v-if="project.language" class="stat-item">
+                    <Code :size="16" />
+                    {{ project.language }}
                   </span>
                 </div>
                 <a :href="project.url" target="_blank" class="project-link">
                   查看项目
-                  <ExternalLink :size="14" />
+                  <ExternalLink :size="16" />
                 </a>
               </div>
             </div>
           </article>
+        </transition-group>
+
+        <!-- 空状态 -->
+        <div v-if="!loading && filteredProjects.length === 0" class="empty-state">
+          <Inbox :size="64" />
+          <p>暂无匹配的项目</p>
         </div>
       </div>
     </main>
@@ -72,13 +125,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { Star, GitFork, ExternalLink, ArrowUp } from 'lucide-vue-next'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { Star, GitFork, ExternalLink, ArrowUp, Rocket, Sparkles, Code, Inbox } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 
 const loading = ref(true)
 const showBackToTop = ref(false)
+const activeFilter = ref('all')
+const sortBy = ref('stars')
 
 interface Project {
   id: number
@@ -89,7 +144,24 @@ interface Project {
   stars: number
   forks: number
   url: string
+  category?: string
+  language?: string
+  featured?: boolean
 }
+
+const filters = [
+  { label: '全部', value: 'all' },
+  { label: 'Vue', value: 'vue' },
+  { label: 'React', value: 'react' },
+  { label: 'TypeScript', value: 'typescript' },
+  { label: '工具', value: 'tools' }
+]
+
+const sortOptions = [
+  { label: '最多 Star', value: 'stars' },
+  { label: '最多 Fork', value: 'forks' },
+  { label: '按名称', value: 'name' }
+]
 
 const projects = ref<Project[]>([
   {
@@ -100,7 +172,10 @@ const projects = ref<Project[]>([
     tags: ['Vue 3', 'TypeScript', 'Vite'],
     stars: 128,
     forks: 32,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'vue',
+    language: 'TypeScript',
+    featured: true
   },
   {
     id: 2,
@@ -110,7 +185,10 @@ const projects = ref<Project[]>([
     tags: ['Vue 3', 'Components', 'CSS'],
     stars: 256,
     forks: 48,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'vue',
+    language: 'Vue',
+    featured: true
   },
   {
     id: 3,
@@ -120,7 +198,9 @@ const projects = ref<Project[]>([
     tags: ['React', 'Monaco Editor', 'WebAssembly'],
     stars: 189,
     forks: 41,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'react',
+    language: 'JavaScript'
   },
   {
     id: 4,
@@ -130,7 +210,9 @@ const projects = ref<Project[]>([
     tags: ['Vue 3', 'Pinia', 'IndexedDB'],
     stars: 94,
     forks: 23,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'vue',
+    language: 'TypeScript'
   },
   {
     id: 5,
@@ -140,7 +222,10 @@ const projects = ref<Project[]>([
     tags: ['TypeScript', 'Markdown', 'Electron'],
     stars: 312,
     forks: 67,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'tools',
+    language: 'TypeScript',
+    featured: true
   },
   {
     id: 6,
@@ -150,9 +235,52 @@ const projects = ref<Project[]>([
     tags: ['Vue 3', 'ECharts', 'D3.js'],
     stars: 176,
     forks: 38,
-    url: 'https://github.com'
+    url: 'https://github.com',
+    category: 'vue',
+    language: 'JavaScript'
   }
 ])
+
+const filteredProjects = computed(() => {
+  let result = projects.value
+
+  // 筛选
+  if (activeFilter.value !== 'all') {
+    result = result.filter(project => {
+      if (activeFilter.value === 'vue') {
+        return project.category === 'vue'
+      } else if (activeFilter.value === 'react') {
+        return project.category === 'react'
+      } else if (activeFilter.value === 'typescript') {
+        return project.tags.some(tag => tag.toLowerCase().includes('typescript'))
+      } else if (activeFilter.value === 'tools') {
+        return project.category === 'tools'
+      }
+      return true
+    })
+  }
+
+  // 排序
+  result = [...result].sort((a, b) => {
+    if (sortBy.value === 'stars') {
+      return b.stars - a.stars
+    } else if (sortBy.value === 'forks') {
+      return b.forks - a.forks
+    } else if (sortBy.value === 'name') {
+      return a.name.localeCompare(b.name)
+    }
+    return 0
+  })
+
+  return result
+})
+
+function formatNumber(num: number): string {
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'k'
+  }
+  return num.toString()
+}
 
 function handleScroll() {
   showBackToTop.value = window.pageYOffset > 300
@@ -198,6 +326,27 @@ onUnmounted(() => {
   padding: var(--spacing-3xl) 0 var(--spacing-2xl);
 }
 
+.header-decoration {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-miku-100), var(--color-cyan-100));
+  border-radius: 50%;
+  animation: float 3s ease-in-out infinite;
+}
+
+.header-icon {
+  color: var(--color-miku-600);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 .projects-title {
   font-size: clamp(var(--text-3xl), 5vw, 48px);
   font-weight: var(--font-bold);
@@ -213,9 +362,109 @@ onUnmounted(() => {
 .projects-subtitle {
   font-size: var(--text-xl);
   color: var(--color-gray-600);
-  margin: 0;
+  margin: 0 0 var(--spacing-2xl) 0;
   font-weight: var(--font-medium);
   line-height: 1.6;
+}
+
+/* 筛选和排序 - 简洁线条风格 */
+.projects-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-lg) 0;
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--color-gray-200);
+  gap: var(--spacing-lg);
+}
+
+.filter-section {
+  flex: 1;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 6px var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-600);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.filter-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--color-miku-400);
+  transition: width var(--transition-fast);
+}
+
+.filter-btn:hover {
+  color: var(--color-miku-600);
+}
+
+.filter-btn.is-active {
+  color: var(--color-miku-600);
+  font-weight: var(--font-semibold);
+}
+
+.filter-btn.is-active::after {
+  width: 100%;
+}
+
+.sort-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.sort-btn {
+  padding: 6px var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-600);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  white-space: nowrap;
+}
+
+.sort-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--color-miku-400);
+  transition: width var(--transition-fast);
+}
+
+.sort-btn:hover {
+  color: var(--color-miku-600);
+}
+
+.sort-btn.is-active {
+  color: var(--color-miku-600);
+  font-weight: var(--font-semibold);
+}
+
+.sort-btn.is-active::after {
+  width: 100%;
 }
 
 /* 加载状态 */
@@ -242,59 +491,106 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* 项目网格 */
-.projects-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: var(--spacing-2xl);
-}
-
-.project-card {
+/* 项目列表 */
+.projects-list {
   display: flex;
   flex-direction: column;
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  gap: var(--spacing-xl);
+}
+
+.project-item {
+  display: flex;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-2xl) 0 var(--spacing-2xl) var(--spacing-md);
+  position: relative;
   transition: all var(--transition-base);
+  cursor: pointer;
 }
 
-.project-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-miku-300);
+/* 左侧强调线 */
+.project-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 0;
+  background: var(--color-miku-400);
+  transition: height var(--transition-base);
 }
 
-.project-cover {
-  width: 100%;
-  height: 200px;
+.project-item:hover::before {
+  height: 100%;
+}
+
+.project-thumbnail {
+  flex-shrink: 0;
+  width: 200px;
+  height: 140px;
+  border-radius: 8px;
   overflow: hidden;
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-gray-200);
 }
 
-.project-cover img {
+.project-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform var(--transition-slow);
 }
 
-.project-card:hover .project-cover img {
+.project-item:hover .project-thumbnail img {
   transform: scale(1.05);
 }
 
-.project-content {
+.project-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: var(--spacing-md);
-  padding: var(--spacing-xl);
-  flex: 1;
+  min-width: 0;
+}
+
+.project-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.project-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .project-name {
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
   color: var(--color-gray-900);
   margin: 0;
+  line-height: 1.4;
+  transition: color var(--transition-fast);
+}
+
+.project-item:hover .project-name {
+  color: var(--color-cyan-500);
+}
+
+.featured-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-yellow-700);
+  background: linear-gradient(135deg, var(--color-yellow-100), var(--color-yellow-200));
+  border: 1px solid var(--color-yellow-300);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
 }
 
 .project-desc {
@@ -302,7 +598,10 @@ onUnmounted(() => {
   color: var(--color-gray-600);
   line-height: 1.6;
   margin: 0;
-  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .project-tags {
@@ -313,18 +612,23 @@ onUnmounted(() => {
 
 .tag {
   font-size: var(--text-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  color: var(--color-miku-600);
-  background: var(--color-miku-50);
+  padding: var(--spacing-xs) var(--spacing-md);
+  color: var(--color-miku-500);
   border: 1px solid var(--color-miku-200);
-  border-radius: var(--radius-md);
-  font-weight: var(--font-medium);
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
 }
 
-.project-footer {
+.project-item:hover .tag {
+  background: var(--color-miku-50);
+  border-color: var(--color-miku-400);
+}
+
+.project-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-lg);
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-gray-200);
 }
@@ -332,6 +636,7 @@ onUnmounted(() => {
 .project-stats {
   display: flex;
   gap: var(--spacing-lg);
+  flex-wrap: wrap;
 }
 
 .stat-item {
@@ -341,25 +646,81 @@ onUnmounted(() => {
   font-size: var(--text-sm);
   color: var(--color-gray-600);
   font-weight: var(--font-medium);
+  transition: color var(--transition-fast);
+}
+
+.stat-item:hover {
+  color: var(--color-miku-600);
 }
 
 .stat-item svg {
   color: var(--color-miku-500);
+  flex-shrink: 0;
 }
 
 .project-link {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-semibold);
   color: var(--color-miku-600);
+  background: var(--color-miku-50);
+  border: 1px solid var(--color-miku-200);
+  border-radius: 6px;
   text-decoration: none;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .project-link:hover {
-  color: var(--color-miku-700);
+  color: var(--color-white);
+  background: linear-gradient(135deg, var(--color-miku-500), var(--color-cyan-500));
+  border-color: transparent;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(57, 197, 187, 0.3);
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-3xl);
+  color: var(--color-gray-500);
+}
+
+.empty-state svg {
+  color: var(--color-gray-400);
+}
+
+.empty-state p {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+/* 列表动画 */
+.project-list-move,
+.project-list-enter-active,
+.project-list-leave-active {
+  transition: all 0.5s ease;
+}
+
+.project-list-enter-from {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.project-list-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.project-list-leave-active {
+  position: absolute;
 }
 
 /* 返回顶部按钮 */
@@ -407,6 +768,16 @@ onUnmounted(() => {
     padding: var(--spacing-2xl) 0;
   }
 
+  .header-decoration {
+    width: 64px;
+    height: 64px;
+  }
+
+  .header-icon {
+    width: 24px;
+    height: 24px;
+  }
+
   .projects-title {
     font-size: var(--text-2xl);
   }
@@ -415,9 +786,41 @@ onUnmounted(() => {
     font-size: var(--text-lg);
   }
 
-  .projects-grid {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-xl);
+  .projects-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .filter-section,
+  .sort-section {
+    width: 100%;
+  }
+
+  .filter-buttons,
+  .sort-section {
+    justify-content: center;
+  }
+
+  .project-item {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .project-thumbnail {
+    width: 100%;
+    height: 180px;
+  }
+
+  .project-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .project-link {
+    width: 100%;
+    justify-content: center;
   }
 
   .back-to-top {
@@ -425,6 +828,13 @@ onUnmounted(() => {
     right: var(--spacing-lg);
     width: 44px;
     height: 44px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .project-thumbnail {
+    width: 160px;
+    height: 120px;
   }
 }
 </style>

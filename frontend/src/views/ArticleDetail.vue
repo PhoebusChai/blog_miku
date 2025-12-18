@@ -155,22 +155,22 @@
             
             <!-- 评论输入 -->
             <div class="comment-form">
-              <input 
-                v-model="newComment.name" 
-                type="text" 
-                placeholder="昵称" 
-                class="glass-input"
-              />
               <textarea 
                 v-model="newComment.content" 
                 placeholder="写下你的评论..." 
                 class="glass-input"
                 rows="3"
               ></textarea>
-              <button class="btn-submit-small" @click="submitComment">
-                <Send :size="14" />
-                发表
-              </button>
+              <div class="comment-form-footer">
+                <label v-if="isLoggedIn" class="anonymous-checkbox">
+                  <input type="checkbox" v-model="newComment.anonymous" />
+                  <span>匿名评论</span>
+                </label>
+                <button class="btn-submit-small" @click="submitComment">
+                  <Send :size="14" />
+                  发表
+                </button>
+              </div>
             </div>
 
             <!-- 评论列表 -->
@@ -181,20 +181,37 @@
               </div>
               <div v-else class="comment-items">
                 <div v-for="comment in comments.slice(0, 3)" :key="comment.id" class="comment-item-small">
-                  <div class="comment-header-small">
-                    <span class="comment-author-small">{{ comment.name }}</span>
-                    <span class="comment-date-small">{{ formatCommentDate(comment.createdAt) }}</span>
+                  <div class="comment-avatar-small">
+                    <img v-if="comment.avatar" :src="comment.avatar" :alt="comment.name" />
+                    <User v-else :size="16" />
                   </div>
-                  <p class="comment-text-small">{{ comment.content }}</p>
-                  <div class="comment-actions-small">
-                    <button class="comment-action-small" @click="likeComment(comment.id)">
-                      <Heart :size="12" />
-                      {{ comment.likes || 0 }}
-                    </button>
-                    <button class="comment-action-small" @click="replyComment(comment.id)">
-                      <MessageCircle :size="12" />
-                      回复
-                    </button>
+                  <div class="comment-content-small">
+                    <div class="comment-header-small">
+                      <span class="comment-author-small">{{ comment.name }}</span>
+                      <span class="comment-date-small">{{ formatCommentDate(comment.createdAt) }}</span>
+                    </div>
+                    <p class="comment-text-small">{{ comment.content }}</p>
+                    <div class="comment-actions-small">
+                      <button 
+                        :class="['comment-action-small', { 'comment-action-liked': isLiked(comment) }]" 
+                        @click="likeComment(comment.id)"
+                      >
+                        <Heart :size="12" :fill="isLiked(comment) ? 'currentColor' : 'none'" />
+                        {{ comment.likes || 0 }}
+                      </button>
+                      <button class="comment-action-small" @click="replyComment(comment.id)">
+                        <MessageCircle :size="12" />
+                        回复
+                      </button>
+                      <button 
+                        v-if="canDeleteComment(comment)" 
+                        class="comment-action-small comment-action-delete" 
+                        @click="deleteComment(comment.id)"
+                      >
+                        <Trash2 :size="12" />
+                        删除
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -216,7 +233,8 @@
           <div class="all-comments-list">
             <div v-for="comment in comments" :key="comment.id" class="comment-item">
               <div class="comment-avatar">
-                <User :size="24" />
+                <img v-if="comment.avatar" :src="comment.avatar" :alt="comment.name" />
+                <User v-else :size="24" />
               </div>
               <div class="comment-content">
                 <div class="comment-header">
@@ -225,13 +243,24 @@
                 </div>
                 <p class="comment-text">{{ comment.content }}</p>
                 <div class="comment-footer">
-                  <button class="comment-action" @click="likeComment(comment.id)">
-                    <Heart :size="14" />
+                  <button 
+                    :class="['comment-action', { 'comment-action-liked': isLiked(comment) }]" 
+                    @click="likeComment(comment.id)"
+                  >
+                    <Heart :size="14" :fill="isLiked(comment) ? 'currentColor' : 'none'" />
                     <span>{{ comment.likes || 0 }}</span>
                   </button>
                   <button class="comment-action" @click="replyComment(comment.id)">
                     <MessageCircle :size="14" />
                     <span>回复</span>
+                  </button>
+                  <button 
+                    v-if="canDeleteComment(comment)" 
+                    class="comment-action comment-action-delete" 
+                    @click="deleteComment(comment.id)"
+                  >
+                    <Trash2 :size="14" />
+                    <span>删除</span>
                   </button>
                 </div>
               </div>
@@ -258,15 +287,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { User, Calendar, Clock, Eye, FileText, Heart, Share2, Bookmark, ArrowUp, ArrowLeft, List, Link, BarChart3, MessageCircle, Send } from 'lucide-vue-next'
+import { User, Calendar, Clock, Eye, FileText, Heart, Share2, Bookmark, ArrowUp, ArrowLeft, List, Link, BarChart3, MessageCircle, Send, Trash2 } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import { useUserStore } from '@/stores/user'
 import type { Article } from '@/types/article'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const article = ref<Article | null>(null)
 const loading = ref(true)
 const tableOfContents = ref<Array<{ id: string; text: string; level: number }>>([])
@@ -274,37 +305,46 @@ const relatedArticles = ref<Article[]>([])
 const showBackToTop = ref(false)
 const readingProgress = ref(0)
 
+// 用户登录状态
+const isLoggedIn = computed(() => userStore.isLoggedIn)
+const currentUser = computed(() => userStore.user)
+
 // 评论相关
 interface Comment {
   id: string
   name: string
   email?: string
+  avatar?: string
   content: string
   createdAt: string
   likes: number
+  userId?: string
+  likedBy?: string[]
 }
 
 const comments = ref<Comment[]>([
   {
     id: '1',
     name: '小明',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiaoming',
     content: '写得很好，学到了很多！期待更多这样的文章。',
     createdAt: '2024-12-16T10:30:00',
-    likes: 5
+    likes: 5,
+    likedBy: []
   },
   {
     id: '2',
     name: '技术爱好者',
     content: '文章深入浅出，对前端工程化的理解很到位。特别是关于性能优化的部分，很有启发。',
     createdAt: '2024-12-16T14:20:00',
-    likes: 3
+    likes: 3,
+    likedBy: []
   }
 ])
 
 const newComment = ref({
-  name: '',
-  email: '',
-  content: ''
+  content: '',
+  anonymous: false
 })
 
 // 格式化评论日期
@@ -325,36 +365,86 @@ const formatCommentDate = (date: string) => {
 
 // 提交评论
 const submitComment = () => {
-  if (!newComment.value.name.trim() || !newComment.value.content.trim()) {
-    alert('请填写昵称和评论内容')
+  if (!newComment.value.content.trim()) {
+    alert('请填写评论内容')
     return
   }
 
+  // 根据登录状态和匿名选项决定显示名称和头像
+  const isAnonymous = !isLoggedIn.value || newComment.value.anonymous
+  const displayName = isAnonymous ? '匿名用户' : (currentUser.value?.name || '用户')
+  const avatarUrl = isAnonymous 
+    ? undefined
+    : (currentUser.value?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`)
+
   const comment: Comment = {
     id: Date.now().toString(),
-    name: newComment.value.name,
-    email: newComment.value.email,
+    name: displayName,
+    avatar: avatarUrl,
     content: newComment.value.content,
     createdAt: new Date().toISOString(),
-    likes: 0
+    likes: 0,
+    userId: isAnonymous ? undefined : currentUser.value?.id,
+    likedBy: []
   }
 
   comments.value.unshift(comment)
   
   // 清空表单
   newComment.value = {
-    name: '',
-    email: '',
-    content: ''
+    content: '',
+    anonymous: false
   }
 }
 
 // 点赞评论
 const likeComment = (commentId: string) => {
   const comment = comments.value.find(c => c.id === commentId)
-  if (comment) {
+  if (!comment) return
+
+  const userId = currentUser.value?.id || 'anonymous'
+  
+  if (!comment.likedBy) {
+    comment.likedBy = []
+  }
+
+  // 检查是否已点赞
+  const likedIndex = comment.likedBy.indexOf(userId)
+  
+  if (likedIndex > -1) {
+    // 取消点赞
+    comment.likedBy.splice(likedIndex, 1)
+    comment.likes = Math.max(0, comment.likes - 1)
+  } else {
+    // 点赞
+    comment.likedBy.push(userId)
     comment.likes = (comment.likes || 0) + 1
   }
+}
+
+// 检查是否已点赞
+const isLiked = (comment: Comment) => {
+  const userId = currentUser.value?.id || 'anonymous'
+  return comment.likedBy?.includes(userId) || false
+}
+
+// 删除评论
+const deleteComment = (commentId: string) => {
+  if (!confirm('确定要删除这条评论吗？')) {
+    return
+  }
+  
+  const index = comments.value.findIndex(c => c.id === commentId)
+  if (index > -1) {
+    comments.value.splice(index, 1)
+  }
+}
+
+// 检查是否可以删除评论
+const canDeleteComment = (comment: Comment) => {
+  if (!isLoggedIn.value) return false
+  // 检查是否是自己的评论（通过 userId 或者创建时间判断）
+  return comment.userId === currentUser.value?.id
 }
 
 // 回复评论
@@ -1199,6 +1289,34 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1);
 }
 
+.comment-form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.anonymous-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-gray-600);
+  cursor: pointer;
+  user-select: none;
+}
+
+.anonymous-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--color-miku-500);
+}
+
+.anonymous-checkbox:hover {
+  color: var(--color-gray-900);
+}
+
 .comment-form textarea {
   resize: vertical;
   min-height: 60px;
@@ -1283,6 +1401,8 @@ onUnmounted(() => {
 }
 
 .comment-item-small {
+  display: flex;
+  gap: 10px;
   padding: 12px 10px;
   background: transparent;
   border-radius: 0;
@@ -1297,6 +1417,30 @@ onUnmounted(() => {
 
 .comment-item-small:hover {
   background: var(--color-miku-50);
+}
+
+.comment-avatar-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--color-miku-100), var(--color-cyan-100));
+  color: var(--color-miku-600);
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.comment-avatar-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.comment-content-small {
+  flex: 1;
+  min-width: 0;
 }
 
 .comment-header-small {
@@ -1348,6 +1492,24 @@ onUnmounted(() => {
 .comment-action-small:hover {
   color: var(--color-miku-600);
   background: var(--color-miku-50);
+}
+
+.comment-action-small.comment-action-liked {
+  color: var(--color-red-500);
+}
+
+.comment-action-small.comment-action-liked:hover {
+  color: var(--color-red-600);
+  background: var(--color-red-50);
+}
+
+.comment-action-small.comment-action-delete {
+  color: var(--color-red-500);
+}
+
+.comment-action-small.comment-action-delete:hover {
+  color: var(--color-red-600);
+  background: var(--color-red-50);
 }
 
 .comment-action-small svg {
@@ -1411,6 +1573,13 @@ onUnmounted(() => {
   color: var(--color-miku-600);
   border-radius: 50%;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.comment-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .comment-content {
@@ -1466,6 +1635,24 @@ onUnmounted(() => {
 .comment-action:hover {
   color: var(--color-miku-500);
   background: var(--color-miku-50);
+}
+
+.comment-action.comment-action-liked {
+  color: var(--color-red-500);
+}
+
+.comment-action.comment-action-liked:hover {
+  color: var(--color-red-600);
+  background: var(--color-red-50);
+}
+
+.comment-action.comment-action-delete {
+  color: var(--color-red-500);
+}
+
+.comment-action.comment-action-delete:hover {
+  color: var(--color-red-600);
+  background: var(--color-red-50);
 }
 
 .comment-action svg {

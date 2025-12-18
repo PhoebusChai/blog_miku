@@ -5,8 +5,11 @@
     <main class="gallery__main">
       <!-- 页面标题 -->
       <div class="gallery-header">
+        <div class="header-decoration">
+          <Camera :size="32" class="header-icon" />
+        </div>
         <h1 class="gallery-title">相册</h1>
-        <p class="gallery-subtitle">记录生活中的美好瞬间 📷</p>
+        <p class="gallery-subtitle">记录生活中的美好瞬间</p>
       </div>
 
       <!-- 相册内容 -->
@@ -95,7 +98,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ArrowUp } from 'lucide-vue-next'
+import { ArrowUp, Camera } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 
@@ -405,7 +408,7 @@ onUnmounted(() => {
   min-height: 100vh;
   padding-top: 60px;
   overflow-x: hidden;
-  background: linear-gradient(to bottom, #fafafa 0%, #f5f5f5 100%);
+  background: var(--color-white);
 }
 
 .gallery__main {
@@ -419,6 +422,21 @@ onUnmounted(() => {
   text-align: center;
   margin-bottom: var(--spacing-3xl);
   padding: var(--spacing-3xl) 0 var(--spacing-2xl);
+}
+
+.header-decoration {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-miku-100), var(--color-cyan-100));
+  border-radius: 50%;
+}
+
+.header-icon {
+  color: var(--color-miku-500);
 }
 
 .gallery-title {

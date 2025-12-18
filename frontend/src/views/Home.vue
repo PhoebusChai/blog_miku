@@ -96,7 +96,13 @@
 
       <!-- 横向特色文章区域 (F型顶部横线) -->
       <section class="featured-section">
-        <h2 class="section-title">精选文章</h2>
+        <div class="section-header">
+          <h2 class="section-title">精选文章</h2>
+          <a href="/archive" class="section-more">
+            查看更多
+            <ArrowRight :size="16" />
+          </a>
+        </div>
         <div class="featured-articles">
           <FeaturedArticle
             v-for="article in featuredArticles"
@@ -114,7 +120,7 @@
           <section class="content-section">
             <div class="section-header">
               <h2 class="section-title">最新项目</h2>
-              <a href="#" class="section-more">
+              <a href="/projects" class="section-more">
                 查看更多
                 <ArrowRight :size="16" />
               </a>
@@ -126,7 +132,7 @@
           <section class="content-section">
             <div class="section-header">
               <h2 class="section-title">生活瞬间</h2>
-              <a href="#" class="section-more">
+              <a href="/gallery" class="section-more">
                 查看更多
                 <ArrowRight :size="16" />
               </a>

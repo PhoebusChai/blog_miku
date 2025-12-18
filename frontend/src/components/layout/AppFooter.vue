@@ -17,16 +17,17 @@
           <ul class="footer-nav-list">
             <li><a href="/" class="footer-nav-link">首页</a></li>
             <li><a href="/archive" class="footer-nav-link">归档</a></li>
+            <li><a href="/projects" class="footer-nav-link">项目</a></li>
             <li><a href="/about" class="footer-nav-link">关于</a></li>
           </ul>
         </div>
         
         <div class="footer-nav-group">
-          <h4 class="footer-nav-title">分类</h4>
+          <h4 class="footer-nav-title">更多</h4>
           <ul class="footer-nav-list">
-            <li><a href="#" class="footer-nav-link">技术分享</a></li>
-            <li><a href="#" class="footer-nav-link">生活随笔</a></li>
-            <li><a href="#" class="footer-nav-link">项目展示</a></li>
+            <li><a href="/gallery" class="footer-nav-link">相册</a></li>
+            <li><a href="/guestbook" class="footer-nav-link">留言板</a></li>
+            <li><a href="/archive" class="footer-nav-link">文章归档</a></li>
           </ul>
         </div>
       </div>
@@ -58,9 +59,7 @@
         <div class="footer-meta">
           <span class="footer-meta-item">Made with <Heart :size="14" class="heart-icon" /> by 落叶无痕</span>
           <span class="footer-meta-divider">|</span>
-          <a href="#" class="footer-meta-link">隐私政策</a>
-          <span class="footer-meta-divider">|</span>
-          <a href="#" class="footer-meta-link">使用条款</a>
+          <span class="footer-meta-item">Powered by Vue 3 + TypeScript</span>
         </div>
       </div>
     </div>
