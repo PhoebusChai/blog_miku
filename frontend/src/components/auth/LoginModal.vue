@@ -379,13 +379,13 @@ function handleForgotPassword(e: Event) {
 .form-error {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-red-50);
   border: 1px solid var(--color-red-200);
   border-radius: 6px;
   color: var(--color-red-700);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .form-error svg {

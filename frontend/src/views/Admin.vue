@@ -1,366 +1,577 @@
 <template>
-  <div class="admin-page">
-    <div class="admin-container">
-      <!-- 页面标题 -->
-      <div class="admin-header">
-        <div class="header-content">
-          <Shield :size="32" class="header-icon" />
-          <div>
-            <h1 class="admin-title">管理后台</h1>
-            <p class="admin-subtitle">系统管理与数据统计</p>
+  <div class="admin-wrapper">
+    <AppHeader />
+    <div class="admin-page">
+      <!-- 侧边栏 -->
+      <aside class="admin-sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <Shield :size="24" />
+            <span v-if="!sidebarCollapsed" class="logo-text">管理后台</span>
           </div>
-        </div>
-      </div>
-
-      <!-- 统计卡片 -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon stat-icon--blue">
-            <Users :size="24" />
-          </div>
-          <div class="stat-content">
-            <div class="stat-label">总用户数</div>
-            <div class="stat-value">2</div>
-            <div class="stat-trend stat-trend--up">
-              <TrendingUp :size="14" />
-              <span>+0%</span>
-            </div>
-          </div>
+          <button class="sidebar-toggle" @click="toggleSidebar">
+            <Menu :size="20" />
+          </button>
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon stat-icon--green">
-            <FileText :size="24" />
+        <nav class="sidebar-nav">
+          <div
+            v-for="menu in menus"
+            :key="menu.id"
+            class="nav-item"
+            :class="{ active: activeMenu === menu.id }"
+            @click="selectMenu(menu.id)"
+          >
+            <component :is="menu.icon" :size="20" class="nav-icon" />
+            <span v-if="!sidebarCollapsed" class="nav-text">{{ menu.label }}</span>
+            <span v-if="!sidebarCollapsed && menu.badge" class="nav-badge">{{ menu.badge }}</span>
           </div>
-          <div class="stat-content">
-            <div class="stat-label">文章总数</div>
-            <div class="stat-value">0</div>
-            <div class="stat-trend stat-trend--up">
-              <TrendingUp :size="14" />
-              <span>+0%</span>
-            </div>
-          </div>
-        </div>
+        </nav>
+      </aside>
 
-        <div class="stat-card">
-          <div class="stat-icon stat-icon--purple">
-            <MessageSquare :size="24" />
+      <!-- 主内容区 -->
+      <main class="admin-main">
+        <!-- 顶部栏 -->
+        <div class="admin-topbar">
+          <div class="topbar-left">
+            <h1 class="page-title">{{ currentMenuLabel }}</h1>
+            <p class="page-subtitle">{{ currentMenuSubtitle }}</p>
           </div>
-          <div class="stat-content">
-            <div class="stat-label">留言总数</div>
-            <div class="stat-value">0</div>
-            <div class="stat-trend stat-trend--up">
-              <TrendingUp :size="14" />
-              <span>+0%</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon stat-icon--orange">
-            <Eye :size="24" />
-          </div>
-          <div class="stat-content">
-            <div class="stat-label">总访问量</div>
-            <div class="stat-value">0</div>
-            <div class="stat-trend stat-trend--up">
-              <TrendingUp :size="14" />
-              <span>+0%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 管理功能 -->
-      <div class="admin-sections">
-        <div class="section-card">
-          <div class="section-header">
-            <FileText :size="20" />
-            <h2>内容管理</h2>
-          </div>
-          <div class="section-content">
-            <button class="action-btn">
-              <Plus :size="18" />
-              <span>新建文章</span>
+          <div class="topbar-right">
+            <button class="topbar-btn" @click="handleAction('refresh')">
+              <RefreshCw :size="18" />
             </button>
-            <button class="action-btn">
-              <List :size="18" />
-              <span>文章列表</span>
-            </button>
-            <button class="action-btn">
-              <FolderOpen :size="18" />
-              <span>分类管理</span>
+            <button class="topbar-btn" @click="handleAction('notification')">
+              <Bell :size="18" />
+              <span v-if="stats.pendingComments > 0" class="notification-dot"></span>
             </button>
           </div>
         </div>
 
-        <div class="section-card">
-          <div class="section-header">
-            <Users :size="20" />
-            <h2>用户管理</h2>
+        <!-- 内容区域 -->
+        <div class="admin-content">
+          <!-- 概览页面 -->
+          <div v-if="activeMenu === 'dashboard'" class="content-wrapper">
+            <Dashboard :stats="stats" @action="handleAction" />
           </div>
-          <div class="section-content">
-            <button class="action-btn">
-              <List :size="18" />
-              <span>用户列表</span>
-            </button>
-            <button class="action-btn">
-              <UserPlus :size="18" />
-              <span>添加用户</span>
-            </button>
-            <button class="action-btn">
-              <Shield :size="18" />
-              <span>权限管理</span>
-            </button>
-          </div>
-        </div>
 
-        <div class="section-card">
-          <div class="section-header">
-            <Settings :size="20" />
-            <h2>系统设置</h2>
+          <!-- 文章管理页面 -->
+          <div v-else-if="activeMenu === 'articles'" class="content-view content-view--full">
+            <ArticleManagement
+              :stats="{
+                total: stats.articles,
+                published: stats.publishedArticles,
+                draft: stats.draftArticles
+              }"
+              @create="handleCreateArticle"
+              @edit="handleEditArticle"
+              @view="handleViewArticle"
+              @delete="handleDeleteArticle"
+              @restore="handleRestoreArticle"
+            />
           </div>
-          <div class="section-content">
-            <button class="action-btn">
-              <Globe :size="18" />
-              <span>网站设置</span>
-            </button>
-            <button class="action-btn">
-              <Palette :size="18" />
-              <span>主题设置</span>
-            </button>
-            <button class="action-btn">
-              <Database :size="18" />
-              <span>数据备份</span>
-            </button>
+
+          <!-- 评论管理页面 -->
+          <div v-else-if="activeMenu === 'comments'" class="content-view content-view--full">
+            <CommentManagement
+              :stats="{
+                total: stats.comments,
+                approved: stats.comments - stats.pendingComments,
+                pending: stats.pendingComments
+              }"
+              @approve="handleApproveComment"
+              @unapprove="handleUnapproveComment"
+              @reply="handleReplyComment"
+              @markSpam="handleMarkSpam"
+              @delete="handleDeleteComment"
+            />
+          </div>
+
+          <!-- 标签管理页面 -->
+          <div v-else-if="activeMenu === 'tags'" class="content-view content-view--full">
+            <TagManagement
+              @create="handleAction('createTag')"
+              @edit="(id) => handleAction(`editTag-${id}`)"
+              @delete="(id) => handleAction(`deleteTag-${id}`)"
+            />
+          </div>
+
+          <!-- 项目管理页面 -->
+          <div v-else-if="activeMenu === 'projects'" class="content-view content-view--full">
+            <ProjectManagement
+              @create="handleAction('createProject')"
+              @edit="(id) => handleAction(`editProject-${id}`)"
+              @delete="(id) => handleAction(`deleteProject-${id}`)"
+            />
+          </div>
+
+          <!-- 图库管理页面 -->
+          <div v-else-if="activeMenu === 'gallery'" class="content-view content-view--full">
+            <GalleryManagement
+              @upload="handleAction('uploadImage')"
+              @view="(id) => handleAction(`viewImage-${id}`)"
+              @copy="(url) => handleAction(`copyImage-${url}`)"
+              @delete="(id) => handleAction(`deleteImage-${id}`)"
+            />
+          </div>
+
+          <!-- 友链管理页面 -->
+          <div v-else-if="activeMenu === 'links'" class="content-view content-view--full">
+            <LinkManagement
+              @create="handleAction('createLink')"
+              @edit="(id) => handleAction(`editLink-${id}`)"
+              @approve="(id) => handleAction(`approveLink-${id}`)"
+              @delete="(id) => handleAction(`deleteLink-${id}`)"
+            />
+          </div>
+
+          <!-- 用户管理页面 -->
+          <div v-else-if="activeMenu === 'users'" class="content-view content-view--full">
+            <UserManagement
+              @create="handleAction('createUser')"
+              @edit="(id) => handleAction(`editUser-${id}`)"
+              @disable="(id) => handleAction(`disableUser-${id}`)"
+              @enable="(id) => handleAction(`enableUser-${id}`)"
+              @delete="(id) => handleAction(`deleteUser-${id}`)"
+            />
+          </div>
+
+          <!-- 其他页面内容 -->
+          <div v-else class="content-view">
+            <PlaceholderView :icon="currentMenuIcon" :title="currentMenuLabel" />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Shield, Users, FileText, MessageSquare, Eye, TrendingUp, Plus, List, FolderOpen, UserPlus, Settings, Globe, Palette, Database } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import {
+  Shield,
+  Users,
+  FileText,
+  MessageSquare,
+  Tag,
+  Briefcase,
+  Image,
+  Link,
+  BookOpen,
+  BarChart3,
+  Settings,
+  Wrench,
+  Menu,
+  RefreshCw,
+  Bell,
+  LayoutDashboard
+} from 'lucide-vue-next'
+import AppHeader from '@/components/layout/AppHeader.vue'
+import Dashboard from '@/components/admin/Dashboard.vue'
+import ArticleManagement from '@/components/admin/ArticleManagement.vue'
+import CommentManagement from '@/components/admin/CommentManagement.vue'
+import TagManagement from '@/components/admin/TagManagement.vue'
+import ProjectManagement from '@/components/admin/ProjectManagement.vue'
+import GalleryManagement from '@/components/admin/GalleryManagement.vue'
+import LinkManagement from '@/components/admin/LinkManagement.vue'
+import UserManagement from '@/components/admin/UserManagement.vue'
+import PlaceholderView from '@/components/admin/PlaceholderView.vue'
+
+// 侧边栏状态
+const sidebarCollapsed = ref(false)
+const activeMenu = ref('dashboard')
+
+// 统计数据
+const stats = ref({
+  users: 2,
+  newUsers: 0,
+  articles: 2,
+  publishedArticles: 2,
+  draftArticles: 0,
+  comments: 3,
+  pendingComments: 1,
+  visits: 0,
+  todayVisits: 0,
+  tags: 10,
+  projects: 0,
+  images: 0,
+  friendLinks: 0,
+  pendingLinks: 0
+})
+
+// 菜单配置
+const menus = computed(() => [
+  { id: 'dashboard', label: '概览', icon: LayoutDashboard, subtitle: '数据统计与快捷操作' },
+  {
+    id: 'articles',
+    label: '文章管理',
+    icon: FileText,
+    badge: stats.value.draftArticles || undefined,
+    subtitle: '管理文章、草稿和回收站'
+  },
+  { id: 'tags', label: '标签管理', icon: Tag, subtitle: '管理文章标签' },
+  {
+    id: 'comments',
+    label: '评论管理',
+    icon: MessageSquare,
+    badge: stats.value.pendingComments || undefined,
+    subtitle: '审核和管理评论'
+  },
+  { id: 'projects', label: '项目管理', icon: Briefcase, subtitle: '管理项目展示' },
+  { id: 'gallery', label: '图库管理', icon: Image, subtitle: '管理图片资源' },
+  {
+    id: 'links',
+    label: '友链管理',
+    icon: Link,
+    badge: stats.value.pendingLinks || undefined,
+    subtitle: '管理友情链接'
+  },
+  { id: 'users', label: '用户管理', icon: Users, subtitle: '管理用户和阅读记录' },
+  { id: 'stats', label: '数据统计', icon: BarChart3, subtitle: '查看访问和文章统计' },
+  { id: 'settings', label: '网站配置', icon: Settings, subtitle: '配置网站基本信息' },
+  { id: 'tools', label: '系统工具', icon: Wrench, subtitle: '备份、缓存和日志' }
+])
+
+// 当前菜单信息
+const currentMenuLabel = computed(() => {
+  const menu = menus.value.find((m) => m.id === activeMenu.value)
+  return menu?.label || ''
+})
+
+const currentMenuSubtitle = computed(() => {
+  const menu = menus.value.find((m) => m.id === activeMenu.value)
+  return menu?.subtitle || ''
+})
+
+const currentMenuIcon = computed(() => {
+  const menu = menus.value.find((m) => m.id === activeMenu.value)
+  return menu?.icon || LayoutDashboard
+})
+
+// 切换侧边栏
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+// 选择菜单
+function selectMenu(menuId: string) {
+  activeMenu.value = menuId
+}
+
+// 文章操作
+function handleCreateArticle() {
+  alert('创建文章功能开发中...')
+}
+
+function handleEditArticle(id: number) {
+  alert(`编辑文章 ID: ${id}`)
+}
+
+function handleViewArticle(id: number) {
+  alert(`查看文章 ID: ${id}`)
+}
+
+function handleDeleteArticle(id: number) {
+  alert(`文章 ID: ${id} 已移至回收站`)
+}
+
+function handleRestoreArticle(id: number) {
+  alert(`文章 ID: ${id} 已恢复为草稿`)
+}
+
+// 评论操作
+function handleApproveComment(id: number) {
+  alert(`评论 ID: ${id} 已通过审核`)
+  stats.value.pendingComments = Math.max(0, stats.value.pendingComments - 1)
+}
+
+function handleUnapproveComment(id: number) {
+  alert(`评论 ID: ${id} 已取消通过`)
+  stats.value.pendingComments++
+}
+
+function handleReplyComment(id: number) {
+  alert(`回复评论 ID: ${id}`)
+}
+
+function handleMarkSpam(id: number) {
+  alert(`评论 ID: ${id} 已标记为垃圾评论`)
+}
+
+function handleDeleteComment(id: number) {
+  alert(`评论 ID: ${id} 已删除`)
+  stats.value.comments--
+}
+
+// 处理操作
+function handleAction(action: string) {
+  console.log('执行操作:', action)
+  alert(`功能开发中: ${action}`)
+}
 </script>
 
 <style scoped>
+.admin-wrapper {
+  min-height: 100vh;
+  background: var(--color-white);
+}
+
 .admin-page {
-  min-height: calc(100vh - 60px);
-  padding: 80px 2vw 40px;
-  background: linear-gradient(to bottom, var(--color-miku-50), var(--color-white));
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--color-white);
+  overflow: hidden;
 }
 
-.admin-container {
-  max-width: 1200px;
-  margin: 0 auto;
+/* 侧边栏 */
+.admin-sidebar {
+  width: 260px;
+  background: var(--color-white);
+  border-right: 1px solid var(--color-gray-200);
+  border-top: 1px solid var(--color-gray-200);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition-normal);
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-/* 页面标题 */
-.admin-header {
-  background: linear-gradient(135deg, var(--color-miku-500), var(--color-cyan-500));
-  border-radius: 16px;
-  padding: var(--spacing-3xl);
-  margin-bottom: var(--spacing-2xl);
-  box-shadow: 0 4px 16px rgba(57, 197, 187, 0.2);
+.admin-sidebar.sidebar-collapsed {
+  width: 70px;
 }
 
-.header-content {
+.sidebar-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xl);
-  color: var(--color-white);
-}
-
-.header-icon {
-  flex-shrink: 0;
-}
-
-.admin-title {
-  font-size: var(--text-3xl);
-  font-weight: var(--font-bold);
-  margin: 0 0 var(--spacing-xs) 0;
-}
-
-.admin-subtitle {
-  font-size: var(--text-base);
-  margin: 0;
-  opacity: 0.9;
-}
-
-/* 统计卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-xl);
-  margin-bottom: var(--spacing-2xl);
-}
-
-.stat-card {
-  background: var(--color-white);
-  border-radius: 12px;
+  justify-content: space-between;
   padding: var(--spacing-xl);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.sidebar-logo {
   display: flex;
-  gap: var(--spacing-lg);
-  transition: all var(--transition-fast);
+  align-items: center;
+  gap: var(--spacing-md);
+  color: var(--color-miku-600);
+  font-weight: var(--font-bold);
+  font-size: var(--text-lg);
 }
 
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+.logo-text {
+  white-space: nowrap;
 }
 
-.stat-icon {
-  width: 56px;
-  height: 56px;
+.sidebar-toggle {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-toggle:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-900);
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-xs);
+  border-radius: 8px;
+  color: var(--color-gray-700);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.nav-item:hover {
+  background: var(--color-miku-50);
+  color: var(--color-miku-700);
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, var(--color-miku-500), var(--color-cyan-500));
+  color: var(--color-white);
+}
+
+.nav-icon {
   flex-shrink: 0;
 }
 
-.stat-icon--blue {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: var(--color-white);
+.nav-text {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
 }
 
-.stat-icon--green {
-  background: linear-gradient(135deg, #10b981, #059669);
+.nav-badge {
+  padding: 2px 8px;
+  background: var(--color-red-500);
   color: var(--color-white);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  border-radius: 10px;
 }
 
-.stat-icon--purple {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  color: var(--color-white);
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: var(--spacing-md);
 }
 
-.stat-icon--orange {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: var(--color-white);
+/* 主内容区 */
+.admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--color-gray-200);
 }
 
-.stat-content {
+/* 顶部栏 */
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-gray-200);
+  flex-shrink: 0;
+}
+
+.topbar-left {
   flex: 1;
 }
 
-.stat-label {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-  margin-bottom: var(--spacing-xs);
-}
-
-.stat-value {
-  font-size: var(--text-3xl);
+.page-title {
+  font-size: var(--text-2xl);
   font-weight: var(--font-bold);
   color: var(--color-gray-900);
-  margin-bottom: var(--spacing-xs);
+  margin: 0 0 var(--spacing-xs) 0;
 }
 
-.stat-trend {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-}
-
-.stat-trend--up {
-  color: #10b981;
-}
-
-/* 管理功能 */
-.admin-sections {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--spacing-xl);
-}
-
-.section-card {
-  background: var(--color-white);
-  border-radius: 12px;
-  padding: var(--spacing-2xl);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-xl);
-  color: var(--color-gray-900);
-}
-
-.section-header h2 {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
+.page-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
   margin: 0;
 }
 
-.section-content {
+.topbar-right {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
-.action-btn {
+.topbar-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-gray-700);
-  background: var(--color-gray-50);
-  border: 1px solid var(--color-gray-200);
+  justify-content: center;
+  background: var(--color-gray-100);
+  border: none;
   border-radius: 8px;
+  color: var(--color-gray-600);
   cursor: pointer;
   transition: all var(--transition-fast);
-  text-align: left;
 }
 
-.action-btn:hover {
-  background: var(--color-miku-50);
-  border-color: var(--color-miku-300);
-  color: var(--color-miku-700);
-  transform: translateX(4px);
+.topbar-btn:hover {
+  background: var(--color-miku-100);
+  color: var(--color-miku-600);
+}
+
+.notification-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-red-500);
+  border-radius: 50%;
+  border: 2px solid var(--color-white);
+}
+
+/* 内容区域 */
+.admin-content {
+  flex: 1;
+  padding: 0;
+  overflow-y: auto;
+  background: var(--color-white);
+}
+
+.content-wrapper {
+  padding: var(--spacing-2xl);
+}
+
+.content-view--full {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.content-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
 }
 
 /* 响应式 */
 @media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .admin-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 200;
+    transform: translateX(-100%);
   }
 
-  .admin-sections {
-    grid-template-columns: 1fr;
+  .admin-sidebar.sidebar-collapsed {
+    transform: translateX(0);
+    width: 70px;
   }
 }
 
 @media (max-width: 768px) {
-  .admin-page {
-    padding: 70px 4vw 30px;
+  .admin-sidebar {
+    width: 100%;
   }
 
-  .admin-header {
-    padding: var(--spacing-2xl);
+  .admin-sidebar.sidebar-collapsed {
+    transform: translateX(-100%);
   }
 
-  .header-content {
-    gap: var(--spacing-lg);
+  .admin-topbar {
+    padding: var(--spacing-lg) var(--spacing-xl);
   }
 
-  .admin-title {
-    font-size: var(--text-2xl);
+  .page-title {
+    font-size: var(--text-xl);
   }
 
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    padding: var(--spacing-lg);
+  .content-wrapper {
+    padding: var(--spacing-xl);
   }
 }
 </style>
