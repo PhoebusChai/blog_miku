@@ -199,7 +199,23 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Mail, Lock, Eye, EyeOff, AlertCircle, Loader, Shield, Sparkles, BookOpen, Users, Zap } from 'lucide-vue-next'
+import {
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Loader,
+  Shield,
+  Sparkles,
+  BookOpen,
+  Users,
+  Zap
+} from 'lucide-vue-next'
+import { sendVerificationCode } from '@/api/email'
+import { registerWithCode } from '@/api/auth'
+import { message } from '@/utils/message'
 
 const router = useRouter()
 
@@ -225,32 +241,41 @@ async function handleRegister() {
   // 验证密码
   if (formData.value.password !== formData.value.confirmPassword) {
     error.value = '两次输入的密码不一致'
+    message.warning('两次输入的密码不一致')
     return
   }
 
-  if (formData.value.password.length < 8) {
-    error.value = '密码长度至少为8个字符'
+  if (formData.value.password.length < 6) {
+    error.value = '密码长度至少为6个字符'
+    message.warning('密码长度至少为6个字符')
     return
   }
 
   if (!formData.value.agree) {
     error.value = '请同意服务条款和隐私政策'
+    message.warning('请同意服务条款和隐私政策')
     return
   }
 
   loading.value = true
 
   try {
-    // 模拟API请求
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    await registerWithCode({
+      email: formData.value.email,
+      code: formData.value.verifyCode,
+      password: formData.value.password,
+      name: formData.value.username
+    })
 
-    // TODO: 实际的注册逻辑
-    console.log('Register:', formData.value)
-
+    message.success('注册成功！即将跳转到登录页面...')
+    
     // 注册成功，跳转到首页
-    router.push('/')
-  } catch (err) {
-    error.value = '注册失败，请稍后重试'
+    setTimeout(() => {
+      router.push('/')
+    }, 1500)
+  } catch (err: any) {
+    error.value = err.message || '注册失败，请稍后重试'
+    message.error(error.value)
   } finally {
     loading.value = false
   }
@@ -264,6 +289,7 @@ function handleLoginClick(e: Event) {
 async function sendVerifyCode() {
   if (!formData.value.email) {
     error.value = '请先输入邮箱地址'
+    message.warning('请先输入邮箱地址')
     return
   }
 
@@ -271,17 +297,16 @@ async function sendVerifyCode() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(formData.value.email)) {
     error.value = '请输入有效的邮箱地址'
+    message.warning('请输入有效的邮箱地址')
     return
   }
 
   error.value = ''
 
   try {
-    // 模拟发送验证码
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await sendVerificationCode(formData.value.email)
     
-    // TODO: 实际的发送验证码逻辑
-    console.log('Send verify code to:', formData.value.email)
+    message.success('验证码已发送到您的邮箱，请查收')
 
     // 开始倒计时
     countdown.value = 60
@@ -292,8 +317,10 @@ async function sendVerifyCode() {
         countdownTimer = null
       }
     }, 1000)
-  } catch (err) {
-    error.value = '发送验证码失败，请稍后重试'
+  } catch (err: any) {
+    const errorMsg = err.message || '发送验证码失败，请稍后重试'
+    error.value = errorMsg
+    message.error(errorMsg)
   }
 }
 

@@ -1,8 +1,8 @@
 <template>
-  <article class="article-card" :class="{ 'article-card--with-image': showImage && article.cover }" @click="goToArticle">
+  <article class="article-card" :class="{ 'article-card--with-image': showImage && article.coverImage }" @click="goToArticle">
     <!-- 图片模式 -->
-    <div v-if="showImage && article.cover" class="article-card__image">
-      <img :src="article.cover" :alt="article.title" />
+    <div v-if="showImage && article.coverImage" class="article-card__image">
+      <img :src="article.coverImage" :alt="article.title" />
     </div>
     
     <div class="article-card__content">
@@ -12,20 +12,20 @@
         <div class="article-card__meta">
           <span class="meta-item">
             <Calendar :size="14" />
-            {{ formatDate(article.createdAt) }}
+            {{ formatDate(article.publishedAt || article.createdAt) }}
           </span>
           <span class="meta-item">
             <Eye :size="14" />
-            {{ article.views }}
+            {{ article.viewCount || 0 }}
           </span>
           <span class="meta-item">
             <Heart :size="14" />
-            {{ article.likes }}
+            {{ article.likeCount || 0 }}
           </span>
         </div>
-        <div class="article-card__tags">
-          <span v-for="tag in article.tags" :key="tag" class="tag">
-            {{ tag }}
+        <div v-if="article.tags && article.tags.length > 0" class="article-card__tags">
+          <span v-for="tag in article.tags" :key="tag.id" class="tag">
+            {{ tag.name }}
           </span>
         </div>
       </div>
@@ -54,7 +54,8 @@ function goToArticle() {
   router.push(`/article/${props.article.id}`)
 }
 
-function formatDate(date: Date) {
+function formatDate(date?: string) {
+  if (!date) return ''
   return new Date(date).toLocaleDateString('zh-CN', {
     month: 'long',
     day: 'numeric'

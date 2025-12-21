@@ -35,7 +35,9 @@
             type="text"
             placeholder="搜索网站名称或链接..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
       </div>
       <div class="action-bar-right">
@@ -59,7 +61,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="link in filteredLinks" :key="link.id" class="link-row">
+          <tr v-for="link in paginatedLinks" :key="link.id" class="link-row">
             <td class="col-site">
               <div class="site-cell">
                 <div class="site-avatar">
@@ -116,6 +118,42 @@
         </button>
       </div>
     </div>
+
+    <!-- 分页 -->
+    <div v-if="filteredLinks.length > 0" class="pagination">
+      <div class="pagination-info">共 {{ filteredLinks.length }} 条，每页 {{ pageSize }} 条</div>
+      <div class="pagination-controls">
+        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
+          <ChevronLeft :size="16" />
+        </button>
+        <button
+          v-for="page in displayPages"
+          :key="page"
+          class="pagination-btn"
+          :class="{ active: page === currentPage }"
+          :disabled="typeof page === 'string'"
+          @click="typeof page === 'number' && (currentPage = page)"
+        >
+          {{ page }}
+        </button>
+        <button
+          class="pagination-btn"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          <ChevronRight :size="16" />
+        </button>
+      </div>
+    </div>
+
+    <!-- 友链表单弹窗 -->
+    <LinkFormModal
+      :visible="showModal"
+      :is-edit="isEditMode"
+      :initial-data="editingLink"
+      @close="showModal = false"
+      @submit="handleModalSubmit"
+    />
   </div>
 </template>
 
@@ -129,20 +167,20 @@ import {
   Link,
   Globe,
   ExternalLink,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
-
-// Emits
-const emit = defineEmits<{
-  create: []
-  edit: [id: number]
-  approve: [id: number]
-  delete: [id: number]
-}>()
+import LinkFormModal from './LinkFormModal.vue'
 
 // 状态
 const activeTab = ref('all')
 const searchKeyword = ref('')
+const currentPage = ref(1)
+const pageSize = ref(10)
+const showModal = ref(false)
+const isEditMode = ref(false)
+const editingLink = ref<any>(null)
 
 // Mock 数据
 const links = ref([
@@ -189,6 +227,51 @@ const filteredLinks = computed(() => {
   return result
 })
 
+// 分页
+const totalPages = computed(() => Math.ceil(filteredLinks.value.length / pageSize.value))
+
+const paginatedLinks = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredLinks.value.slice(start, end)
+})
+
+const displayPages = computed(() => {
+  const pages: (number | string)[] = []
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+
+  return pages
+})
+
 // 方法
 function getStatusText(status: number): string {
   const statusMap: Record<number, string> = {
@@ -200,21 +283,62 @@ function getStatusText(status: number): string {
 }
 
 function handleCreate() {
-  emit('create')
+  isEditMode.value = false
+  editingLink.value = null
+  showModal.value = true
 }
 
 function handleEdit(id: number) {
-  emit('edit', id)
+  const link = links.value.find((l) => l.id === id)
+  if (link) {
+    isEditMode.value = true
+    editingLink.value = {
+      name: link.name,
+      url: link.url,
+      avatar: link.avatar,
+      description: link.description,
+      status: link.status
+    }
+    showModal.value = true
+  }
 }
 
 function handleApprove(id: number) {
-  emit('approve', id)
+  const link = links.value.find((l) => l.id === id)
+  if (link) {
+    link.status = 1
+    console.log('通过友链:', id)
+  }
 }
 
 function handleDelete(id: number) {
   if (confirm('确定要删除这个友链吗？')) {
-    emit('delete', id)
+    const index = links.value.findIndex((l) => l.id === id)
+    if (index !== -1) {
+      links.value.splice(index, 1)
+      console.log('删除友链:', id)
+    }
   }
+}
+
+function handleSearch() {
+  console.log('搜索关键词:', searchKeyword.value)
+}
+
+function handleModalSubmit(data: any) {
+  if (isEditMode.value) {
+    console.log('更新友链:', data)
+    // TODO: 调用API更新友链
+  } else {
+    const newLink = {
+      id: links.value.length + 1,
+      ...data,
+      createdAt: new Date().toISOString().split('T')[0]
+    }
+    links.value.push(newLink)
+    console.log('创建友链:', newLink)
+  }
+  showModal.value = false
 }
 </script>
 
@@ -223,6 +347,7 @@ function handleDelete(id: number) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width:100%;
   min-height: 0;
 }
 
@@ -230,7 +355,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
 }
@@ -309,6 +434,24 @@ function handleDelete(id: number) {
 
 .search-input::placeholder {
   color: var(--color-gray-400);
+}
+
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
 }
 
 .primary-btn {
@@ -563,5 +706,57 @@ function handleDelete(id: number) {
 .empty-state p {
   margin: 0 0 var(--spacing-xl) 0;
   font-size: var(--text-base);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) 2%;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.pagination-info {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.pagination-btn {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-700);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--color-miku-500);
+  color: var(--color-miku-600);
+}
+
+.pagination-btn.active {
+  background: var(--color-miku-500);
+  border-color: var(--color-miku-500);
+  color: var(--color-white);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

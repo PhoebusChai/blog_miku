@@ -22,10 +22,13 @@ export const useUserStore = defineStore('user', () => {
 
   // 登出
   const logoutUser = async () => {
-    await logout()
-    user.value = null
-    token.value = ''
-    isLoggedIn.value = false
+    try {
+      await logout()
+    } finally {
+      user.value = null
+      token.value = ''
+      isLoggedIn.value = false
+    }
   }
 
   // 初始化用户信息（从 localStorage 恢复）
@@ -39,7 +42,16 @@ export const useUserStore = defineStore('user', () => {
       }
     } catch (error) {
       console.error('初始化用户信息失败:', error)
+      // 清除无效的登录状态
+      user.value = null
+      token.value = ''
+      isLoggedIn.value = false
     }
+  }
+
+  // 检查是否是管理员
+  const isAdmin = () => {
+    return user.value?.role === 1
   }
 
   return {
@@ -48,6 +60,7 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     loginUser,
     logoutUser,
-    initUser
+    initUser,
+    isAdmin
   }
 })

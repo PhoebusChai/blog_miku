@@ -1,7 +1,17 @@
 <template>
   <div class="friend-links">
     <h3 class="friend-links__title">友情链接</h3>
-    <div class="friend-links__list">
+    
+    <!-- 空状态 -->
+    <div v-if="links.length === 0" class="links-empty">
+      <div class="links-empty-icon">
+        <Link2 :size="28" />
+      </div>
+      <p class="links-empty-text">暂无链接</p>
+    </div>
+
+    <!-- 链接列表 -->
+    <div v-else class="friend-links__list">
       <a
         v-for="link in links"
         :key="link.name"
@@ -30,6 +40,7 @@
  * 友情链接组件
  * @description 展示友情链接列表
  */
+import { Link2 } from 'lucide-vue-next'
 
 interface FriendLink {
   name: string
@@ -42,12 +53,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  links: () => [
-    { name: 'Vue.js 官网', url: 'https://vuejs.org' },
-    { name: 'TypeScript 文档', url: 'https://www.typescriptlang.org' },
-    { name: 'MDN Web Docs', url: 'https://developer.mozilla.org' },
-    { name: 'GitHub', url: 'https://github.com' }
-  ]
+  links: () => []
 })
 </script>
 
@@ -61,6 +67,41 @@ const props = withDefaults(defineProps<Props>(), {
   font-weight: var(--font-semibold);
   margin-bottom: var(--spacing-md);
   color: var(--color-gray-900);
+}
+
+/* 空状态 */
+.links-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  text-align: center;
+  min-height: 120px;
+}
+
+.links-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-md);
+}
+
+.links-empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.links-empty-text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-500);
+  margin: 0;
 }
 
 .friend-links__list {

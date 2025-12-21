@@ -81,11 +81,77 @@
         </button>
       </div>
     </div>
+
+    <!-- 最近活动 -->
+    <div class="recent-activity">
+      <h2 class="section-title">最近活动</h2>
+      <div class="activity-list">
+        <div v-for="activity in recentActivities" :key="activity.id" class="activity-item">
+          <div class="activity-icon" :class="`activity-icon--${activity.type}`">
+            <component :is="getActivityIcon(activity.type)" :size="16" />
+          </div>
+          <div class="activity-content">
+            <div class="activity-text">{{ activity.text }}</div>
+            <div class="activity-time">{{ activity.time }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 系统状态 -->
+    <div class="system-status">
+      <h2 class="section-title">系统状态</h2>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="status-header">
+            <span class="status-label">服务器状态</span>
+            <span class="status-badge status-badge--success">正常</span>
+          </div>
+          <div class="status-bar">
+            <div class="status-bar-fill" style="width: 95%"></div>
+          </div>
+          <div class="status-info">运行时间: 15天 8小时</div>
+        </div>
+        <div class="status-item">
+          <div class="status-header">
+            <span class="status-label">数据库</span>
+            <span class="status-badge status-badge--success">正常</span>
+          </div>
+          <div class="status-bar">
+            <div class="status-bar-fill" style="width: 88%"></div>
+          </div>
+          <div class="status-info">连接数: 12/100</div>
+        </div>
+        <div class="status-item">
+          <div class="status-header">
+            <span class="status-label">磁盘空间</span>
+            <span class="status-badge status-badge--warning">注意</span>
+          </div>
+          <div class="status-bar">
+            <div class="status-bar-fill status-bar-fill--warning" style="width: 72%"></div>
+          </div>
+          <div class="status-info">已使用: 72.5 GB / 100 GB</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Users, FileText, MessageSquare, Eye, TrendingUp, Plus, Upload, Clock } from 'lucide-vue-next'
+import { ref } from 'vue'
+import {
+  Users,
+  FileText,
+  MessageSquare,
+  Eye,
+  TrendingUp,
+  Plus,
+  Upload,
+  Clock,
+  Edit,
+  Trash2,
+  UserPlus
+} from 'lucide-vue-next'
 
 interface Props {
   stats: {
@@ -104,6 +170,25 @@ defineProps<Props>()
 defineEmits<{
   action: [action: string]
 }>()
+
+const recentActivities = ref([
+  { id: 1, type: 'article', text: '发布了新文章《Vue 3 Composition API 实践》', time: '2分钟前' },
+  { id: 2, type: 'comment', text: '张三 评论了文章《欢迎来到我的博客》', time: '15分钟前' },
+  { id: 3, type: 'user', text: '新用户 李四 注册了账号', time: '1小时前' },
+  { id: 4, type: 'article', text: '更新了文章《TypeScript 入门指南》', time: '2小时前' },
+  { id: 5, type: 'delete', text: '删除了评论 #123', time: '3小时前' }
+])
+
+function getActivityIcon(type: string) {
+  const icons: Record<string, any> = {
+    article: FileText,
+    comment: MessageSquare,
+    user: UserPlus,
+    edit: Edit,
+    delete: Trash2
+  }
+  return icons[type] || FileText
+}
 </script>
 
 <style scoped>
@@ -254,5 +339,148 @@ defineEmits<{
   .action-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.recent-activity,
+.system-status {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: var(--spacing-2xl);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.activity-item {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-gray-50);
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.activity-item:hover {
+  background: var(--color-gray-100);
+}
+
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.activity-icon--article {
+  background: var(--color-miku-100);
+  color: var(--color-miku-600);
+}
+
+.activity-icon--comment {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.activity-icon--user {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.activity-icon--edit {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.activity-icon--delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.activity-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-text {
+  font-size: var(--text-sm);
+  color: var(--color-gray-900);
+}
+
+.activity-time {
+  font-size: var(--text-xs);
+  color: var(--color-gray-500);
+}
+
+.status-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-700);
+}
+
+.status-badge {
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  border-radius: 12px;
+}
+
+.status-badge--success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-bar {
+  height: 8px;
+  background: var(--color-gray-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.status-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-miku-500), var(--color-cyan-500));
+  border-radius: 4px;
+  transition: width var(--transition-fast);
+}
+
+.status-bar-fill--warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.status-info {
+  font-size: var(--text-xs);
+  color: var(--color-gray-600);
 }
 </style>

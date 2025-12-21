@@ -16,7 +16,9 @@
             type="text"
             placeholder="搜索标签名称..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
       </div>
       <div class="action-bar-right">
@@ -100,56 +102,37 @@
         </button>
       </div>
     </div>
+
+    <!-- 标签表单弹窗 -->
+    <TagFormModal
+      :visible="showModal"
+      :is-edit="isEditMode"
+      :initial-data="editingTag"
+      @close="showModal = false"
+      @submit="handleModalSubmit"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Search, Plus, Edit, Trash2, Tag, ChevronLeft, ChevronRight } from 'lucide-vue-next'
-
-// Emits
-const emit = defineEmits<{
-  create: []
-  edit: [id: number]
-  delete: [id: number]
-}>()
+import TagFormModal from './TagFormModal.vue'
+import { getTags, createTag, updateTag, deleteTag, type Tag as TagType } from '@/api/tag'
+import { message } from '@/utils/message'
 
 // 状态
 const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const showModal = ref(false)
+const isEditMode = ref(false)
+const editingTag = ref<any>(null)
+const editingTagId = ref<number | null>(null)
+const loading = ref(false)
 
-// Mock 数据
-const tags = ref([
-  {
-    id: 1,
-    name: 'Vue.js',
-    slug: 'vuejs',
-    articleCount: 5,
-    createdAt: '2024-12-01'
-  },
-  {
-    id: 2,
-    name: 'TypeScript',
-    slug: 'typescript',
-    articleCount: 3,
-    createdAt: '2024-12-01'
-  },
-  {
-    id: 3,
-    name: 'JavaScript',
-    slug: 'javascript',
-    articleCount: 8,
-    createdAt: '2024-12-01'
-  },
-  {
-    id: 4,
-    name: '前端开发',
-    slug: 'frontend',
-    articleCount: 12,
-    createdAt: '2024-12-01'
-  }
-])
+// 标签数据
+const tags = ref<TagType[]>([])
 
 // 筛选标签
 const filteredTags = computed(() => {
@@ -208,19 +191,84 @@ const displayPages = computed(() => {
 })
 
 // 方法
+async function loadTags() {
+  try {
+    loading.value = true
+    const data = await getTags()
+    tags.value = data || []
+  } catch (error: any) {
+    message.error(error.message || '加载标签失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 function handleCreate() {
-  emit('create')
+  isEditMode.value = false
+  editingTag.value = null
+  editingTagId.value = null
+  showModal.value = true
 }
 
 function handleEdit(id: number) {
-  emit('edit', id)
-}
-
-function handleDelete(id: number) {
-  if (confirm('确定要删除这个标签吗？')) {
-    emit('delete', id)
+  const tag = tags.value.find((t) => t.id === id)
+  if (tag) {
+    isEditMode.value = true
+    editingTagId.value = id
+    editingTag.value = {
+      name: tag.name,
+      slug: tag.slug
+    }
+    showModal.value = true
   }
 }
+
+async function handleDelete(id: number) {
+  const tag = tags.value.find((t) => t.id === id)
+  if (!tag) return
+
+  if (tag.articleCount && tag.articleCount > 0) {
+    message.error('该标签下还有文章，无法删除')
+    return
+  }
+
+  if (!confirm('确定要删除这个标签吗？')) {
+    return
+  }
+
+  try {
+    await deleteTag(id)
+    message.success('删除成功')
+    await loadTags()
+  } catch (error: any) {
+    message.error(error.message || '删除失败')
+  }
+}
+
+function handleSearch() {
+  currentPage.value = 1
+}
+
+async function handleModalSubmit(data: any) {
+  try {
+    if (isEditMode.value && editingTagId.value) {
+      await updateTag(editingTagId.value, data)
+      message.success('更新成功')
+    } else {
+      await createTag(data)
+      message.success('创建成功')
+    }
+    showModal.value = false
+    await loadTags()
+  } catch (error: any) {
+    message.error(error.message || '操作失败')
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  loadTags()
+})
 </script>
 
 <style scoped>
@@ -228,6 +276,7 @@ function handleDelete(id: number) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width:100%;
   min-height: 0;
 }
 
@@ -235,7 +284,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
 }
@@ -307,6 +356,24 @@ function handleDelete(id: number) {
 
 .search-input::placeholder {
   color: var(--color-gray-400);
+}
+
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
 }
 
 .primary-btn {
@@ -497,7 +564,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-top: 1px solid var(--color-gray-200);
 }

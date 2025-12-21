@@ -1,7 +1,17 @@
 <template>
   <div class="article-ranking">
     <h3 class="article-ranking__title">文章排行</h3>
-    <div class="article-ranking__list">
+    
+    <!-- 空状态 -->
+    <div v-if="articles.length === 0" class="ranking-empty">
+      <div class="ranking-empty-icon">
+        <TrendingUp :size="32" />
+      </div>
+      <p class="ranking-empty-text">暂无排行数据</p>
+    </div>
+    
+    <!-- 文章列表 -->
+    <div v-else class="article-ranking__list">
       <a
         v-for="(article, index) in articles"
         :key="article.id"
@@ -35,7 +45,7 @@
  * 文章排行榜组件
  * @description 展示热门文章排行
  */
-import { Eye } from 'lucide-vue-next'
+import { Eye, TrendingUp } from 'lucide-vue-next'
 
 interface RankingArticle {
   id: number
@@ -50,13 +60,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  articles: () => [
-    { id: 1, title: 'Vue 3 Composition API 深度解析', views: '1.2k' },
-    { id: 2, title: 'TypeScript 类型体操实战', views: '987' },
-    { id: 3, title: 'CSS 现代布局技术指南', views: '856' },
-    { id: 4, title: 'Vite 5.0 新特性全面解读', views: '654' },
-    { id: 5, title: '前端性能优化实战指南', views: '543' }
-  ]
+  articles: () => []
 })
 </script>
 
@@ -70,6 +74,41 @@ const props = withDefaults(defineProps<Props>(), {
   font-weight: var(--font-semibold);
   margin-bottom: var(--spacing-md);
   color: var(--color-gray-900);
+}
+
+/* 空状态 */
+.ranking-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  text-align: center;
+  border-radius: var(--radius-md);
+  min-height: 140px;
+}
+
+.ranking-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-md);
+}
+
+.ranking-empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.ranking-empty-text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-500);
+  margin: 0;
 }
 
 .article-ranking__list {
@@ -155,5 +194,26 @@ const props = withDefaults(defineProps<Props>(), {
   gap: var(--spacing-xs);
   font-size: var(--text-xs);
   color: var(--color-gray-500);
+}
+
+@media (max-width: 768px) {
+  .ranking-empty {
+    padding: var(--spacing-lg) var(--spacing-md);
+    min-height: 120px;
+  }
+
+  .ranking-empty-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ranking-empty-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ranking-empty-text {
+    font-size: var(--text-xs);
+  }
 }
 </style>

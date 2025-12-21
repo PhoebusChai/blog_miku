@@ -24,23 +24,23 @@
         <article class="article-content glass-card">
           <!-- 文章标题和元信息 -->
           <header class="article-header">
-            <div class="article-category">
+            <div v-if="article.tags && article.tags.length > 0" class="article-category">
               <FileText :size="14" />
-              {{ article.category }}
+              {{ article.tags[0].name }}
             </div>
             <h1 class="article-title">{{ article.title }}</h1>
             <div class="article-meta">
               <span class="meta-item">
                 <Calendar :size="14" />
-                {{ formatDate(article.createdAt) }}
+                {{ formatDate(article.publishedAt || article.createdAt || '') }}
               </span>
               <span class="meta-item">
                 <Clock :size="14" />
-                {{ article.readTime || '5' }}分钟
+                {{ calculateReadTime(article.content) }}分钟
               </span>
               <span class="meta-item">
                 <Eye :size="14" />
-                {{ article.views || 0 }}
+                {{ article.viewCount || 0 }}
               </span>
             </div>
           </header>
@@ -54,29 +54,37 @@
           </div>
 
           <!-- 文章正文 -->
-          <div class="article-body" v-html="article.content"></div>
+          <div ref="articleBodyRef" class="article-body"></div>
 
           <!-- 标签 -->
           <div v-if="article.tags && article.tags.length" class="article-tags">
             <span class="tags-label">标签：</span>
-            <span v-for="tag in article.tags" :key="tag" class="tag">
-              #{{ tag }}
+            <span v-for="tag in article.tags" :key="tag.id" class="tag">
+              #{{ tag.name }}
             </span>
           </div>
 
           <!-- 文章底部操作 -->
           <div class="article-actions">
-            <button class="action-btn like-btn">
-              <Heart :size="18" />
-              <span>{{ article.likes || 0 }}</span>
+            <button 
+              :class="['action-btn', 'like-btn', { 'active': articleStatus.isLiked }]"
+              @click="toggleLike"
+              :disabled="!isLoggedIn"
+            >
+              <Heart :size="18" :fill="articleStatus.isLiked ? 'currentColor' : 'none'" />
+              <span>{{ article.likeCount || 0 }}</span>
             </button>
-            <button class="action-btn share-btn">
+            <button class="action-btn share-btn" @click="shareArticle">
               <Share2 :size="18" />
               <span>分享</span>
             </button>
-            <button class="action-btn bookmark-btn">
-              <Bookmark :size="18" />
-              <span>收藏</span>
+            <button 
+              :class="['action-btn', 'bookmark-btn', { 'active': articleStatus.isBookmarked }]"
+              @click="toggleBookmark"
+              :disabled="!isLoggedIn"
+            >
+              <Bookmark :size="18" :fill="articleStatus.isBookmarked ? 'currentColor' : 'none'" />
+              <span>{{ articleStatus.isBookmarked ? '已收藏' : '收藏' }}</span>
             </button>
           </div>
         </article>
@@ -91,26 +99,26 @@
             </h3>
             <div class="stats-grid">
               <div class="stat-item">
-                <div class="stat-value">{{ article.views || 0 }}</div>
+                <div class="stat-value">{{ article.viewCount || 0 }}</div>
                 <div class="stat-label">浏览</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ article.likes || 0 }}</div>
+                <div class="stat-value">{{ article.likeCount || 0 }}</div>
                 <div class="stat-label">点赞</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ article.comments || 0 }}</div>
+                <div class="stat-value">{{ article.commentCount || 0 }}</div>
                 <div class="stat-label">评论</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ article.shares || 0 }}</div>
+                <div class="stat-value">0</div>
                 <div class="stat-label">分享</div>
               </div>
             </div>
           </div>
 
           <!-- 目录 -->
-          <div class="sidebar-card glass-card toc-card">
+          <div v-if="tableOfContents.length > 0" class="sidebar-card glass-card toc-card">
             <h3 class="sidebar-card__title">
               <List :size="16" />
               目录
@@ -118,11 +126,23 @@
             <nav class="toc">
               <ul class="toc-list">
                 <li v-for="(heading, index) in tableOfContents" :key="index" 
-                    :class="['toc-item', `toc-level-${heading.level}`]">
-                  <a :href="`#${heading.id}`" class="toc-link">{{ heading.text }}</a>
+                    :class="['toc-item', `toc-level-${heading.level}`, { 'toc-active': activeHeadingId === heading.id }]">
+                  <a :href="`#${heading.id}`" class="toc-link" @click.prevent="scrollToHeading(heading.id)">
+                    {{ heading.text }}
+                  </a>
                 </li>
               </ul>
             </nav>
+          </div>
+          <div v-else class="sidebar-card glass-card toc-card">
+            <h3 class="sidebar-card__title">
+              <List :size="16" />
+              目录
+            </h3>
+            <div class="empty-state">
+              <FileText :size="32" class="empty-icon" />
+              <p class="empty-text">暂无目录</p>
+            </div>
           </div>
 
           <!-- 相关文章 -->
@@ -131,19 +151,20 @@
               <Link :size="16" />
               相关文章
             </h3>
-            <ul class="related-list">
+            <ul v-if="relatedArticles.length > 0" class="related-list">
               <li v-for="related in relatedArticles" :key="related.id" class="related-item">
                 <a :href="`/article/${related.id}`" class="related-link">
-                  <div class="related-thumb" v-if="related.cover">
-                    <img :src="related.cover" :alt="related.title" />
-                  </div>
                   <div class="related-info">
                     <h4 class="related-title">{{ related.title }}</h4>
-                    <p class="related-date">{{ formatDate(related.createdAt) }}</p>
+                    <p class="related-date">{{ formatDate(related.publishedAt || related.createdAt || '') }}</p>
                   </div>
                 </a>
               </li>
             </ul>
+            <div v-else class="empty-state">
+              <Link :size="32" class="empty-icon" />
+              <p class="empty-text">暂无相关文章</p>
+            </div>
           </div>
 
           <!-- 评论区 -->
@@ -182,31 +203,31 @@
               <div v-else class="comment-items">
                 <div v-for="comment in comments.slice(0, 3)" :key="comment.id" class="comment-item-small">
                   <div class="comment-avatar-small">
-                    <img v-if="comment.avatar" :src="comment.avatar" :alt="comment.name" />
+                    <img v-if="comment.avatar" :src="comment.avatar" :alt="(comment as any).name" />
                     <User v-else :size="16" />
                   </div>
                   <div class="comment-content-small">
                     <div class="comment-header-small">
-                      <span class="comment-author-small">{{ comment.name }}</span>
-                      <span class="comment-date-small">{{ formatCommentDate(comment.createdAt) }}</span>
+                      <span class="comment-author-small">{{ (comment as any).name }}</span>
+                      <span class="comment-date-small">{{ formatCommentDate(comment.createdAt || '') }}</span>
                     </div>
                     <p class="comment-text-small">{{ comment.content }}</p>
                     <div class="comment-actions-small">
                       <button 
                         :class="['comment-action-small', { 'comment-action-liked': isLiked(comment) }]" 
-                        @click="likeComment(comment.id)"
+                        @click="likeComment(comment.id!)"
                       >
                         <Heart :size="12" :fill="isLiked(comment) ? 'currentColor' : 'none'" />
-                        {{ comment.likes || 0 }}
+                        {{ comment.likeCount || 0 }}
                       </button>
-                      <button class="comment-action-small" @click="replyComment(comment.id)">
+                      <button class="comment-action-small" @click="replyComment(comment.id!)">
                         <MessageCircle :size="12" />
                         回复
                       </button>
                       <button 
                         v-if="canDeleteComment(comment)" 
                         class="comment-action-small comment-action-delete" 
-                        @click="deleteComment(comment.id)"
+                        @click="deleteComment(comment.id!)"
                       >
                         <Trash2 :size="12" />
                         删除
@@ -233,31 +254,31 @@
           <div class="all-comments-list">
             <div v-for="comment in comments" :key="comment.id" class="comment-item">
               <div class="comment-avatar">
-                <img v-if="comment.avatar" :src="comment.avatar" :alt="comment.name" />
+                <img v-if="comment.avatar" :src="comment.avatar" :alt="(comment as any).name" />
                 <User v-else :size="24" />
               </div>
               <div class="comment-content">
                 <div class="comment-header">
-                  <span class="comment-author">{{ comment.name }}</span>
-                  <span class="comment-date">{{ formatCommentDate(comment.createdAt) }}</span>
+                  <span class="comment-author">{{ (comment as any).name }}</span>
+                  <span class="comment-date">{{ formatCommentDate(comment.createdAt || '') }}</span>
                 </div>
                 <p class="comment-text">{{ comment.content }}</p>
                 <div class="comment-footer">
                   <button 
                     :class="['comment-action', { 'comment-action-liked': isLiked(comment) }]" 
-                    @click="likeComment(comment.id)"
+                    @click="likeComment(comment.id!)"
                   >
                     <Heart :size="14" :fill="isLiked(comment) ? 'currentColor' : 'none'" />
-                    <span>{{ comment.likes || 0 }}</span>
+                    <span>{{ comment.likeCount || 0 }}</span>
                   </button>
-                  <button class="comment-action" @click="replyComment(comment.id)">
+                  <button class="comment-action" @click="replyComment(comment.id!)">
                     <MessageCircle :size="14" />
                     <span>回复</span>
                   </button>
                   <button 
                     v-if="canDeleteComment(comment)" 
                     class="comment-action comment-action-delete" 
-                    @click="deleteComment(comment.id)"
+                    @click="deleteComment(comment.id!)"
                   >
                     <Trash2 :size="14" />
                     <span>删除</span>
@@ -287,173 +308,303 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { User, Calendar, Clock, Eye, FileText, Heart, Share2, Bookmark, ArrowUp, ArrowLeft, List, Link, BarChart3, MessageCircle, Send, Trash2 } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import { useUserStore } from '@/stores/user'
-import type { Article } from '@/types/article'
+import { getArticleDetail, getArticleList, getArticleStatus, likeArticle, unlikeArticle, bookmarkArticle, unbookmarkArticle } from '@/api/article'
+import { getArticleComments, createComment, likeComment as apiLikeComment, unlikeComment as apiUnlikeComment, deleteComment as apiDeleteComment, type Comment } from '@/api/comment'
+import { message } from '@/utils/message'
+import type { Article as ArticleType } from '@/api/article'
+import Vditor from 'vditor'
+import 'vditor/dist/index.css'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const article = ref<Article | null>(null)
+const article = ref<ArticleType | null>(null)
 const loading = ref(true)
 const tableOfContents = ref<Array<{ id: string; text: string; level: number }>>([])
-const relatedArticles = ref<Article[]>([])
+const relatedArticles = ref<ArticleType[]>([])
 const showBackToTop = ref(false)
 const readingProgress = ref(0)
+const articleBodyRef = ref<HTMLElement | null>(null)
+const activeHeadingId = ref<string>('')
 
 // 用户登录状态
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const currentUser = computed(() => userStore.user)
 
-// 评论相关
-interface Comment {
-  id: string
-  name: string
-  email?: string
-  avatar?: string
-  content: string
-  createdAt: string
-  likes: number
-  userId?: string
-  likedBy?: string[]
+// 文章状态（点赞、收藏）
+const articleStatus = ref({
+  isLiked: false,
+  isBookmarked: false
+})
+
+// 加载文章状态
+const loadArticleStatus = async () => {
+  if (!article.value?.id || !isLoggedIn.value) return
+  
+  try {
+    const status = await getArticleStatus(article.value.id)
+    articleStatus.value = status
+  } catch (error) {
+    console.error('加载文章状态失败:', error)
+  }
 }
 
-const comments = ref<Comment[]>([
-  {
-    id: '1',
-    name: '小明',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiaoming',
-    content: '写得很好，学到了很多！期待更多这样的文章。',
-    createdAt: '2024-12-16T10:30:00',
-    likes: 5,
-    likedBy: []
-  },
-  {
-    id: '2',
-    name: '技术爱好者',
-    content: '文章深入浅出，对前端工程化的理解很到位。特别是关于性能优化的部分，很有启发。',
-    createdAt: '2024-12-16T14:20:00',
-    likes: 3,
-    likedBy: []
+// 切换点赞
+const toggleLike = async () => {
+  if (!isLoggedIn.value) {
+    message.warning('请先登录')
+    return
   }
-])
+  
+  if (!article.value?.id) return
+  
+  try {
+    if (articleStatus.value.isLiked) {
+      // 取消点赞
+      await unlikeArticle(article.value.id)
+      articleStatus.value.isLiked = false
+      if (article.value.likeCount) {
+        article.value.likeCount = Math.max(0, article.value.likeCount - 1)
+      }
+      message.success('已取消点赞')
+    } else {
+      // 点赞
+      await likeArticle(article.value.id)
+      articleStatus.value.isLiked = true
+      article.value.likeCount = (article.value.likeCount || 0) + 1
+      message.success('点赞成功')
+    }
+  } catch (error: any) {
+    console.error('点赞操作失败:', error)
+    message.error(error.message || '操作失败')
+  }
+}
+
+// 切换收藏
+const toggleBookmark = async () => {
+  if (!isLoggedIn.value) {
+    message.warning('请先登录')
+    return
+  }
+  
+  if (!article.value?.id) return
+  
+  try {
+    if (articleStatus.value.isBookmarked) {
+      // 取消收藏
+      await unbookmarkArticle(article.value.id)
+      articleStatus.value.isBookmarked = false
+      message.success('已取消收藏')
+    } else {
+      // 收藏
+      await bookmarkArticle(article.value.id)
+      articleStatus.value.isBookmarked = true
+      message.success('收藏成功')
+    }
+  } catch (error: any) {
+    console.error('收藏操作失败:', error)
+    message.error(error.message || '操作失败')
+  }
+}
+
+// 分享文章
+const shareArticle = () => {
+  if (navigator.share) {
+    navigator.share({
+      title: article.value?.title,
+      text: article.value?.summary,
+      url: window.location.href
+    }).catch(err => console.log('分享失败:', err))
+  } else {
+    // 复制链接到剪贴板
+    navigator.clipboard.writeText(window.location.href)
+      .then(() => message.success('链接已复制到剪贴板'))
+      .catch(() => message.error('复制失败'))
+  }
+}
+
+// 评论相关
+const comments = ref<Comment[]>([])
+const commentLikes = ref<Set<number>>(new Set()) // 记录用户点赞的评论ID
 
 const newComment = ref({
   content: '',
   anonymous: false
 })
 
+// 加载评论列表
+const loadComments = async () => {
+  if (!article.value?.id) return
+  
+  try {
+    const response = await getArticleComments(article.value.id)
+    comments.value = response.comments.map(c => ({
+      ...c,
+      name: c.userName || c.guestName || '匿名用户',
+      avatar: c.userAvatar
+    })) as any
+  } catch (error) {
+    console.error('加载评论失败:', error)
+  }
+}
+
 // 格式化评论日期
 const formatCommentDate = (date: string) => {
-  const d = new Date(date)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
+  if (!date) return 'Invalid Date'
+  
+  try {
+    const d = new Date(date)
+    
+    // 检查日期是否有效
+    if (isNaN(d.getTime())) {
+      return 'Invalid Date'
+    }
+    
+    const now = new Date()
+    const diff = now.getTime() - d.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
 
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
-  if (hours < 24) return `${hours} 小时前`
-  if (days < 7) return `${days} 天前`
-  return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+    if (minutes < 1) return '刚刚'
+    if (minutes < 60) return `${minutes} 分钟前`
+    if (hours < 24) return `${hours} 小时前`
+    if (days < 7) return `${days} 天前`
+    return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+  } catch (error) {
+    console.error('日期格式化错误:', error, date)
+    return 'Invalid Date'
+  }
 }
 
 // 提交评论
-const submitComment = () => {
+const submitComment = async () => {
   if (!newComment.value.content.trim()) {
-    alert('请填写评论内容')
+    message.warning('请填写评论内容')
     return
   }
 
-  // 根据登录状态和匿名选项决定显示名称和头像
-  const isAnonymous = !isLoggedIn.value || newComment.value.anonymous
-  const displayName = isAnonymous ? '匿名用户' : (currentUser.value?.name || '用户')
-  const avatarUrl = isAnonymous 
-    ? undefined
-    : (currentUser.value?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`)
+  try {
+    const commentData: any = {
+      articleId: article.value?.id,
+      content: newComment.value.content
+    }
 
-  const comment: Comment = {
-    id: Date.now().toString(),
-    name: displayName,
-    avatar: avatarUrl,
-    content: newComment.value.content,
-    createdAt: new Date().toISOString(),
-    likes: 0,
-    userId: isAnonymous ? undefined : currentUser.value?.id,
-    likedBy: []
-  }
+    // 如果未登录或选择匿名，需要提供游客信息
+    if (!isLoggedIn.value || newComment.value.anonymous) {
+      // 这里可以弹出对话框让用户输入昵称和邮箱
+      // 暂时使用默认值
+      commentData.guestName = '匿名用户'
+    }
 
-  comments.value.unshift(comment)
-  
-  // 清空表单
-  newComment.value = {
-    content: '',
-    anonymous: false
+    await createComment(commentData)
+    message.success('评论成功')
+    
+    // 更新文章评论数
+    if (article.value) {
+      article.value.commentCount = (article.value.commentCount || 0) + 1
+    }
+    
+    // 清空表单
+    newComment.value = {
+      content: '',
+      anonymous: false
+    }
+    
+    // 重新加载评论列表
+    await loadComments()
+  } catch (error: any) {
+    console.error('评论失败:', error)
+    message.error(error.message || '评论失败')
   }
 }
 
 // 点赞评论
-const likeComment = (commentId: string) => {
-  const comment = comments.value.find(c => c.id === commentId)
-  if (!comment) return
-
-  const userId = currentUser.value?.id || 'anonymous'
-  
-  if (!comment.likedBy) {
-    comment.likedBy = []
-  }
-
-  // 检查是否已点赞
-  const likedIndex = comment.likedBy.indexOf(userId)
-  
-  if (likedIndex > -1) {
-    // 取消点赞
-    comment.likedBy.splice(likedIndex, 1)
-    comment.likes = Math.max(0, comment.likes - 1)
-  } else {
-    // 点赞
-    comment.likedBy.push(userId)
-    comment.likes = (comment.likes || 0) + 1
+const likeComment = async (commentId: number) => {
+  try {
+    if (commentLikes.value.has(commentId)) {
+      // 取消点赞
+      await apiUnlikeComment(commentId)
+      commentLikes.value.delete(commentId)
+      
+      // 更新本地数据
+      const comment = comments.value.find(c => c.id === commentId)
+      if (comment && comment.likeCount) {
+        comment.likeCount = Math.max(0, comment.likeCount - 1)
+      }
+    } else {
+      // 点赞
+      await apiLikeComment(commentId)
+      commentLikes.value.add(commentId)
+      
+      // 更新本地数据
+      const comment = comments.value.find(c => c.id === commentId)
+      if (comment) {
+        comment.likeCount = (comment.likeCount || 0) + 1
+      }
+    }
+  } catch (error) {
+    console.error('点赞失败:', error)
+    message.error('操作失败')
   }
 }
 
 // 检查是否已点赞
 const isLiked = (comment: Comment) => {
-  const userId = currentUser.value?.id || 'anonymous'
-  return comment.likedBy?.includes(userId) || false
+  return comment.id ? commentLikes.value.has(comment.id) : false
 }
 
 // 删除评论
-const deleteComment = (commentId: string) => {
+const deleteComment = async (commentId: number) => {
   if (!confirm('确定要删除这条评论吗？')) {
     return
   }
   
-  const index = comments.value.findIndex(c => c.id === commentId)
-  if (index > -1) {
-    comments.value.splice(index, 1)
+  try {
+    await apiDeleteComment(commentId)
+    message.success('删除成功')
+    
+    // 更新文章评论数
+    if (article.value && article.value.commentCount && article.value.commentCount > 0) {
+      article.value.commentCount = article.value.commentCount - 1
+    }
+    
+    // 重新加载评论列表
+    await loadComments()
+  } catch (error: any) {
+    console.error('删除失败:', error)
+    message.error(error.message || '删除失败')
   }
 }
 
 // 检查是否可以删除评论
 const canDeleteComment = (comment: Comment) => {
   if (!isLoggedIn.value) return false
-  // 检查是否是自己的评论（通过 userId 或者创建时间判断）
+  
+  // 管理员可以删除任何评论
+  if (currentUser.value?.role === 1) return true
+  
+  // 匿名评论（没有 userId）只能管理员删除
+  if (!comment.userId) return false
+  
+  // 用户只能删除自己的评论
   return comment.userId === currentUser.value?.id
 }
 
 // 回复评论
-const replyingTo = ref<string | null>(null)
-const replyComment = (commentId: string) => {
+const replyingTo = ref<number | null>(null)
+const replyComment = (commentId: number) => {
   replyingTo.value = commentId
   const comment = comments.value.find(c => c.id === commentId)
   if (comment) {
-    newComment.value.content = `@${comment.name} `
+    const name = (comment as any).name || '用户'
+    newComment.value.content = `@${name} `
   }
 }
 
@@ -471,21 +622,107 @@ const toggleAllComments = () => {
 
 // 格式化日期
 const formatDate = (date: string) => {
+  if (!date) return ''
   const d = new Date(date)
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-// 提取目录
-const extractTableOfContents = (content: string) => {
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(content, 'text/html')
-  const headings = doc.querySelectorAll('h1, h2, h3, h4')
+// 计算阅读时间（基于字数）
+const calculateReadTime = (content: string) => {
+  if (!content) return 5
+  // 移除HTML标签
+  const text = content.replace(/<[^>]*>/g, '')
+  // 中文字符数 + 英文单词数
+  const chineseChars = text.match(/[\u4e00-\u9fa5]/g)?.length || 0
+  const englishWords = text.match(/[a-zA-Z]+/g)?.length || 0
+  const totalChars = chineseChars + englishWords
+  // 假设每分钟阅读300字
+  return Math.max(1, Math.ceil(totalChars / 300))
+}
+
+// 渲染Markdown内容
+const renderMarkdown = async (content: string) => {
+  if (!articleBodyRef.value) return
   
-  return Array.from(headings).map((heading, index) => ({
-    id: `heading-${index}`,
-    text: heading.textContent || '',
-    level: parseInt(heading.tagName.substring(1))
-  }))
+  try {
+    console.log('渲染Markdown内容，长度:', content.length)
+    console.log('articleBodyRef:', articleBodyRef.value)
+    
+    // 使用 Vditor.preview 渲染
+    Vditor.preview(articleBodyRef.value, content, {
+      cdn: 'https://unpkg.com/vditor@3.11.2',
+      mode: 'light',
+      hljs: { 
+        style: 'github',
+        enable: true,
+        lineNumber: false
+      },
+      markdown: {
+        toc: true,
+        mark: true,
+        footnotes: true,
+        autoSpace: true
+      },
+      after: () => {
+        console.log('Vditor.preview 渲染完成')
+        // 渲染完成后提取目录
+        extractTableOfContents()
+        // 为标题添加ID
+        addHeadingIds()
+      }
+    })
+  } catch (error) {
+    console.error('Markdown渲染失败:', error)
+    // 如果渲染失败，直接显示原始内容
+    if (articleBodyRef.value) {
+      articleBodyRef.value.innerHTML = `<div class="error-message" style="color: red; padding: 20px; background: #fee; border-radius: 8px; margin-bottom: 20px;">
+        <strong>Markdown 渲染失败</strong><br>
+        错误信息: ${error}
+      </div><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre>`
+    }
+  }
+}
+
+// 提取目录
+const extractTableOfContents = () => {
+  if (!articleBodyRef.value) return
+  
+  const headings = articleBodyRef.value.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  tableOfContents.value = Array.from(headings).map((heading, index) => {
+    const level = parseInt(heading.tagName.substring(1))
+    const text = heading.textContent || ''
+    const id = `heading-${index}`
+    
+    return { id, text, level }
+  })
+}
+
+// 为标题添加ID以支持锚点跳转
+const addHeadingIds = () => {
+  if (!articleBodyRef.value) return
+  
+  const headings = articleBodyRef.value.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  headings.forEach((heading, index) => {
+    heading.id = `heading-${index}`
+  })
+}
+
+// 监听滚动更新当前激活的标题
+const updateActiveHeading = () => {
+  if (!articleBodyRef.value) return
+  
+  const headings = articleBodyRef.value.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+  
+  let currentHeading = ''
+  headings.forEach((heading) => {
+    const rect = heading.getBoundingClientRect()
+    if (rect.top <= 100) {
+      currentHeading = heading.id
+    }
+  })
+  
+  activeHeadingId.value = currentHeading
 }
 
 // 加载文章数据
@@ -494,95 +731,59 @@ const loadArticle = async () => {
   const id = route.params.id
   
   try {
-    // TODO: 调用 API 获取文章详情
-    // const response = await getArticleById(id)
-    // article.value = response.data
+    // 调用 API 获取文章详情
+    const response = await getArticleDetail(Number(id))
+    article.value = response
     
-    // 模拟数据
-    setTimeout(() => {
-      article.value = {
-        id: id as string,
-        title: '探索现代前端开发的艺术与科学',
-        category: '技术分享',
-        cover: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=1200&h=600&fit=crop',
-        author: '落叶无痕',
-        authorAvatar: '',
-        authorBio: '全栈开发工程师，热爱技术分享与开源贡献',
-        createdAt: '2024-12-15',
-        readTime: '8',
-        views: 1234,
-        likes: 89,
-        comments: 23,
-        shares: 15,
-        summary: '本文深入探讨了现代前端开发的核心理念，从组件化设计到性能优化，从用户体验到工程化实践，带你领略前端开发的魅力。',
-        tags: ['Vue3', 'TypeScript', '前端工程化', '性能优化'],
-        content: `
-          <p class="drop-cap">在当今快速发展的互联网时代，前端开发已经从简单的页面制作演变成了一门复杂而精妙的工程学科。它不仅需要扎实的技术功底，更需要对用户体验的深刻理解和对性能优化的不懈追求。</p>
-          
-          <h2>组件化设计的哲学</h2>
-          <p>组件化是现代前端开发的基石。通过将复杂的界面拆分成可复用的独立单元，我们不仅提高了代码的可维护性，更建立了一套清晰的开发范式。</p>
-          
-          <blockquote class="magazine-quote">
-            <p>"好的组件设计就像乐高积木，每一块都有其独特的功能，但又能完美地组合在一起。"</p>
-            <cite>— 前端架构师的智慧</cite>
-          </blockquote>
-          
-          <h2>性能优化的艺术</h2>
-          <p>性能优化是一个永恒的话题。从代码分割到懒加载，从虚拟滚动到防抖节流，每一个细节都可能影响用户的体验。</p>
-          
-          <div class="highlight-box">
-            <h3>关键性能指标</h3>
-            <ul>
-              <li><strong>FCP (First Contentful Paint)</strong>: 首次内容绘制时间</li>
-              <li><strong>LCP (Largest Contentful Paint)</strong>: 最大内容绘制时间</li>
-              <li><strong>TTI (Time to Interactive)</strong>: 可交互时间</li>
-              <li><strong>CLS (Cumulative Layout Shift)</strong>: 累积布局偏移</li>
-            </ul>
-          </div>
-          
-          <h2>用户体验的追求</h2>
-          <p>技术最终是为用户服务的。一个优秀的前端开发者不仅要写出高质量的代码，更要站在用户的角度思考问题，创造流畅、直观、令人愉悦的交互体验。</p>
-          
-          <p>从微交互到动画效果，从响应式设计到无障碍访问，每一个细节都体现着对用户的尊重和关怀。</p>
-          
-          <h2>工程化实践</h2>
-          <p>随着项目规模的增长，工程化变得越来越重要。构建工具、代码规范、自动化测试、持续集成，这些都是保证项目质量和团队协作效率的关键。</p>
-          
-          <p>现代前端开发已经不再是单打独斗，而是需要整个团队的协作和配合。良好的工程化实践能够让团队更加高效地工作。</p>
-        `
-      } as Article
-      
-      if (article.value?.content) {
-        tableOfContents.value = extractTableOfContents(article.value.content)
-      }
-      
-      // 模拟相关文章
-      relatedArticles.value = [
-        {
-          id: '2',
-          title: 'Vue 3 组合式 API 最佳实践',
-          createdAt: '2024-12-10',
-          cover: ''
-        },
-        {
-          id: '3',
-          title: 'TypeScript 类型体操进阶',
-          createdAt: '2024-12-08',
-          cover: ''
-        },
-        {
-          id: '4',
-          title: '前端性能优化实战指南',
-          createdAt: '2024-12-05',
-          cover: ''
-        }
-      ] as Article[]
-      
-      loading.value = false
-    }, 800)
-  } catch (error) {
-    console.error('加载文章失败:', error)
+    console.log('文章数据:', article.value)
+    console.log('文章内容:', article.value?.content)
+    console.log('内容类型:', typeof article.value?.content)
+    
+    // 先设置 loading 为 false，让 DOM 渲染
     loading.value = false
+    
+    // 等待DOM更新后渲染Markdown
+    await nextTick()
+    await nextTick() // 多等一个 tick 确保 DOM 完全渲染
+    
+    console.log('articleBodyRef.value:', articleBodyRef.value)
+    
+    if (article.value?.content && articleBodyRef.value) {
+      console.log('开始渲染Markdown...')
+      await renderMarkdown(article.value.content)
+      console.log('Markdown渲染完成')
+    } else {
+      console.warn('文章内容为空或 DOM 未就绪', {
+        hasContent: !!article.value?.content,
+        hasRef: !!articleBodyRef.value
+      })
+    }
+    
+    // 加载相关文章（获取最新的3篇文章作为相关文章）
+    try {
+      const relatedResponse = await getArticleList({ page: 1, pageSize: 4 })
+      // 过滤掉当前文章
+      relatedArticles.value = relatedResponse.records
+        .filter(item => item.id !== article.value?.id)
+        .slice(0, 3)
+    } catch (err) {
+      console.error('加载相关文章失败:', err)
+    }
+    
+    // 加载评论列表
+    await loadComments()
+    
+    // 加载文章状态（点赞、收藏）
+    await loadArticleStatus()
+  } catch (error: any) {
+    console.error('加载文章失败:', error)
+    message.error('加载文章失败')
+    loading.value = false
+    
+    // 如果文章不存在，跳转到404页面
+    if (error.response?.status === 404) {
+      router.push('/404')
+    }
   }
 }
 
@@ -599,6 +800,9 @@ const handleScroll = () => {
   if (scrollableHeight > 0) {
     readingProgress.value = Math.min((scrollTop / scrollableHeight) * 100, 100)
   }
+  
+  // 更新当前激活的标题
+  updateActiveHeading()
 }
 
 // 返回顶部
@@ -612,6 +816,18 @@ const scrollToTop = () => {
 // 返回上一页
 const goBack = () => {
   router.back()
+}
+
+// 滚动到指定标题
+const scrollToHeading = (id: string) => {
+  const element = document.getElementById(id)
+  if (element) {
+    const top = element.offsetTop - 100
+    window.scrollTo({
+      top,
+      behavior: 'smooth'
+    })
+  }
 }
 
 onMounted(() => {
@@ -1173,6 +1389,13 @@ onUnmounted(() => {
   color: var(--color-miku-600);
   border-left-color: var(--color-miku-500);
   background: var(--color-miku-50);
+}
+
+.toc-item.toc-active .toc-link {
+  color: var(--color-miku-600);
+  border-left-color: var(--color-miku-500);
+  background: var(--color-miku-50);
+  font-weight: var(--font-semibold);
 }
 
 /* 相关文章 - 紧凑列表 */
@@ -1845,5 +2068,121 @@ onUnmounted(() => {
   background: linear-gradient(90deg, var(--color-miku-400), var(--color-cyan-400));
   transition: width 0.1s ease-out;
   box-shadow: 0 0 10px rgba(57, 197, 187, 0.5);
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: var(--color-gray-400);
+  text-align: center;
+}
+
+.empty-icon {
+  color: var(--color-gray-300);
+  margin-bottom: 12px;
+  stroke-width: 1.5;
+}
+
+.empty-text {
+  font-size: 13px;
+  color: var(--color-gray-500);
+  margin: 0;
+}
+
+/* Vditor 预览样式优化 */
+.article-body :deep(.vditor-reset) {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--color-gray-800);
+}
+
+.article-body :deep(.vditor-reset h1),
+.article-body :deep(.vditor-reset h2),
+.article-body :deep(.vditor-reset h3),
+.article-body :deep(.vditor-reset h4),
+.article-body :deep(.vditor-reset h5),
+.article-body :deep(.vditor-reset h6) {
+  scroll-margin-top: 100px;
+}
+
+.article-body :deep(.vditor-reset h2) {
+  font-size: 22px;
+  font-weight: var(--font-bold);
+  margin-top: 48px;
+  margin-bottom: 16px;
+  color: var(--color-gray-900);
+  letter-spacing: -0.01em;
+}
+
+.article-body :deep(.vditor-reset h3) {
+  font-size: 18px;
+  font-weight: var(--font-semibold);
+  margin-top: 32px;
+  margin-bottom: 12px;
+  color: var(--color-gray-800);
+}
+
+.article-body :deep(.vditor-reset p) {
+  margin-bottom: 20px;
+  text-align: justify;
+}
+
+.article-body :deep(.vditor-reset blockquote) {
+  position: relative;
+  margin: 32px 0;
+  padding: 24px 32px;
+  background: var(--color-gray-50);
+  border-left: 3px solid var(--color-miku-500);
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.article-body :deep(.vditor-reset code) {
+  padding: 2px 6px;
+  background: var(--color-gray-100);
+  border-radius: 3px;
+  font-size: 0.9em;
+  color: var(--color-pink-600);
+}
+
+.article-body :deep(.vditor-reset pre) {
+  margin: 24px 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.article-body :deep(.vditor-reset pre code) {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.article-body :deep(.vditor-reset table) {
+  margin: 24px 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.article-body :deep(.vditor-reset table th),
+.article-body :deep(.vditor-reset table td) {
+  padding: 12px;
+  border: 1px solid var(--color-gray-200);
+}
+
+.article-body :deep(.vditor-reset table th) {
+  background: var(--color-gray-50);
+  font-weight: var(--font-semibold);
+}
+
+.article-body :deep(.vditor-reset img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 24px 0;
 }
 </style>

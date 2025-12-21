@@ -1,7 +1,17 @@
 <template>
   <div class="recent-activities">
     <h3 class="recent-activities__title">最新动态</h3>
-    <div class="recent-activities__list">
+    
+    <!-- 空状态 -->
+    <div v-if="activities.length === 0" class="activities-empty">
+      <div class="activities-empty-icon">
+        <Activity :size="28" />
+      </div>
+      <p class="activities-empty-text">暂无动态</p>
+    </div>
+
+    <!-- 动态列表 -->
+    <div v-else class="recent-activities__list">
       <div
         v-for="(activity, index) in activities"
         :key="index"
@@ -25,8 +35,7 @@
  * 最新动态组件
  * @description 展示博主的最新活动时间线
  */
-import { FileText, Code, Star } from 'lucide-vue-next'
-import { h } from 'vue'
+import { FileText, Code, Star, Activity } from 'lucide-vue-next'
 
 type ActivityType = 'article' | 'code' | 'star'
 
@@ -48,23 +57,7 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  activities: () => [
-    {
-      type: 'article',
-      text: '发布了新文章《Vue 3 性能优化实践》',
-      time: '2 小时前'
-    },
-    {
-      type: 'code',
-      text: '更新了项目 personal-blog 的代码',
-      time: '1 天前'
-    },
-    {
-      type: 'star',
-      text: '收藏了文章《TypeScript 类型体操》',
-      time: '3 天前'
-    }
-  ]
+  activities: () => []
 })
 
 const emit = defineEmits<Emits>()
@@ -93,6 +86,41 @@ function handleActivityClick(activity: Activity) {
   font-weight: var(--font-semibold);
   margin-bottom: var(--spacing-md);
   color: var(--color-gray-900);
+}
+
+/* 空状态 */
+.activities-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  text-align: center;
+  min-height: 120px;
+}
+
+.activities-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-md);
+}
+
+.activities-empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.activities-empty-text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-500);
+  margin: 0;
 }
 
 .recent-activities__list {

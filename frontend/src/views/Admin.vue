@@ -50,14 +50,26 @@
 
         <!-- 内容区域 -->
         <div class="admin-content">
+          <!-- 文章编辑器 -->
+          <div v-if="showArticleEditor" class="content-view content-view--full">
+            <ArticleEditor
+              :article-id="editingArticleId"
+              :is-edit="isEditingArticle"
+              @back="closeArticleEditor"
+              @save="handleSaveArticle"
+              @publish="handlePublishArticle"
+            />
+          </div>
+
           <!-- 概览页面 -->
-          <div v-if="activeMenu === 'dashboard'" class="content-wrapper">
+          <div v-else-if="activeMenu === 'dashboard'" class="content-wrapper">
             <Dashboard :stats="stats" @action="handleAction" />
           </div>
 
           <!-- 文章管理页面 -->
           <div v-else-if="activeMenu === 'articles'" class="content-view content-view--full">
             <ArticleManagement
+              :key="articleListKey"
               :stats="{
                 total: stats.articles,
                 published: stats.publishedArticles,
@@ -68,6 +80,7 @@
               @view="handleViewArticle"
               @delete="handleDeleteArticle"
               @restore="handleRestoreArticle"
+              @stats-update="handleArticleStatsUpdate"
             />
           </div>
 
@@ -136,6 +149,16 @@
             />
           </div>
 
+          <!-- 网站配置页面 -->
+          <div v-else-if="activeMenu === 'settings'" class="content-view content-view--full">
+            <SiteSettings @save="handleSaveSettings" @reset="handleResetSettings" />
+          </div>
+
+          <!-- 系统工具页面 -->
+          <div v-else-if="activeMenu === 'tools'" class="content-view content-view--full">
+            <SystemTools @action="handleAction" />
+          </div>
+
           <!-- 其他页面内容 -->
           <div v-else class="content-view">
             <PlaceholderView :icon="currentMenuIcon" :title="currentMenuLabel" />
@@ -147,7 +170,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Shield,
   Users,
@@ -157,8 +181,6 @@ import {
   Briefcase,
   Image,
   Link,
-  BookOpen,
-  BarChart3,
   Settings,
   Wrench,
   Menu,
@@ -169,17 +191,50 @@ import {
 import AppHeader from '@/components/layout/AppHeader.vue'
 import Dashboard from '@/components/admin/Dashboard.vue'
 import ArticleManagement from '@/components/admin/ArticleManagement.vue'
+import ArticleEditor from '@/components/admin/ArticleEditor.vue'
 import CommentManagement from '@/components/admin/CommentManagement.vue'
 import TagManagement from '@/components/admin/TagManagement.vue'
 import ProjectManagement from '@/components/admin/ProjectManagement.vue'
 import GalleryManagement from '@/components/admin/GalleryManagement.vue'
 import LinkManagement from '@/components/admin/LinkManagement.vue'
 import UserManagement from '@/components/admin/UserManagement.vue'
+import SiteSettings from '@/components/admin/SiteSettings.vue'
+import SystemTools from '@/components/admin/SystemTools.vue'
 import PlaceholderView from '@/components/admin/PlaceholderView.vue'
+import { createArticle, updateArticle, getArticleDetail, deleteArticle } from '@/api/article'
+import { message } from '@/utils/message'
+import { ElMessageBox } from 'element-plus'
+
+const route = useRoute()
+const router = useRouter()
 
 // 侧边栏状态
 const sidebarCollapsed = ref(false)
 const activeMenu = ref('dashboard')
+
+// 从路由路径获取菜单ID
+function getMenuIdFromPath(path: string): string {
+  const match = path.match(/\/admin\/(\w+)/)
+  return match ? match[1] : 'dashboard'
+}
+
+// 初始化和监听路由变化
+onMounted(() => {
+  activeMenu.value = getMenuIdFromPath(route.path)
+})
+
+watch(() => route.path, (newPath) => {
+  if (newPath.startsWith('/admin/')) {
+    activeMenu.value = getMenuIdFromPath(newPath)
+  }
+})
+
+// 文章编辑器状态
+const showArticleEditor = ref(false)
+const editingArticleId = ref<number>()
+const isEditingArticle = ref(false)
+const isSaving = ref(false)
+const articleListKey = ref(0) // 用于强制刷新文章列表
 
 // 统计数据
 const stats = ref({
@@ -227,7 +282,6 @@ const menus = computed(() => [
     subtitle: '管理友情链接'
   },
   { id: 'users', label: '用户管理', icon: Users, subtitle: '管理用户和阅读记录' },
-  { id: 'stats', label: '数据统计', icon: BarChart3, subtitle: '查看访问和文章统计' },
   { id: 'settings', label: '网站配置', icon: Settings, subtitle: '配置网站基本信息' },
   { id: 'tools', label: '系统工具', icon: Wrench, subtitle: '备份、缓存和日志' }
 ])
@@ -255,28 +309,144 @@ function toggleSidebar() {
 
 // 选择菜单
 function selectMenu(menuId: string) {
-  activeMenu.value = menuId
+  // 更新路由
+  router.push(`/admin/${menuId}`)
 }
 
 // 文章操作
 function handleCreateArticle() {
-  alert('创建文章功能开发中...')
+  showArticleEditor.value = true
+  isEditingArticle.value = false
+  editingArticleId.value = undefined
 }
 
 function handleEditArticle(id: number) {
-  alert(`编辑文章 ID: ${id}`)
+  showArticleEditor.value = true
+  isEditingArticle.value = true
+  editingArticleId.value = id
+}
+
+function closeArticleEditor() {
+  showArticleEditor.value = false
+  editingArticleId.value = undefined
+  isEditingArticle.value = false
+}
+
+async function handleSaveArticle(articleData: any) {
+  if (isSaving.value) return // 防止重复提交
+  
+  try {
+    isSaving.value = true
+    
+    // 准备文章数据，状态设为草稿 (0)
+    const data = {
+      title: articleData.title,
+      content: articleData.content,
+      summary: articleData.summary,
+      coverImage: articleData.coverImage,
+      status: 0, // 草稿
+      isTop: articleData.isTop ? 1 : 0,
+      tagIds: articleData.tagIds || [] // 标签ID数组
+    }
+
+    if (isEditingArticle.value && editingArticleId.value) {
+      // 更新文章
+      await updateArticle(editingArticleId.value, data)
+      message.success('草稿已保存')
+    } else {
+      // 创建新文章
+      const result = await createArticle(data)
+      message.success('草稿已保存')
+      // 保存成功后，切换到编辑模式
+      isEditingArticle.value = true
+      editingArticleId.value = result.id
+    }
+  } catch (error: any) {
+    console.error('保存文章失败:', error)
+    message.error(error.message || '保存失败，请重试')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function handlePublishArticle(articleData: any) {
+  if (isSaving.value) return // 防止重复提交
+  
+  try {
+    isSaving.value = true
+    
+    // 准备文章数据，状态设为已发布 (1)
+    const data = {
+      title: articleData.title,
+      content: articleData.content,
+      summary: articleData.summary,
+      coverImage: articleData.coverImage,
+      status: 1, // 已发布
+      isTop: articleData.isTop ? 1 : 0,
+      tagIds: articleData.tagIds || [] // 标签ID数组
+    }
+
+    if (isEditingArticle.value && editingArticleId.value) {
+      // 更新文章
+      await updateArticle(editingArticleId.value, data)
+      message.success('文章已发布')
+    } else {
+      // 创建新文章
+      await createArticle(data)
+      message.success('文章已发布')
+    }
+    
+    closeArticleEditor()
+    // 刷新文章列表（通过切换到文章管理页面）
+    articleListKey.value++
+    selectMenu('articles')
+  } catch (error: any) {
+    console.error('发布文章失败:', error)
+    message.error(error.message || '发布失败，请重试')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 function handleViewArticle(id: number) {
-  alert(`查看文章 ID: ${id}`)
+  // 在新标签页打开文章详情
+  window.open(`/article/${id}`, '_blank')
 }
 
-function handleDeleteArticle(id: number) {
-  alert(`文章 ID: ${id} 已移至回收站`)
+async function handleDeleteArticle(id: number) {
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这篇文章吗？删除后可以在回收站中恢复。',
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await deleteArticle(id)
+    message.success('文章已移至回收站')
+    
+    // 刷新文章列表
+    articleListKey.value++
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除文章失败:', error)
+      message.error(error.message || '删除失败，请重试')
+    }
+  }
 }
 
 function handleRestoreArticle(id: number) {
-  alert(`文章 ID: ${id} 已恢复为草稿`)
+  // TODO: 实现恢复文章功能
+  message.info('恢复功能开发中')
+}
+
+function handleArticleStatsUpdate(articleStats: { total: number; published: number; draft: number }) {
+  stats.value.articles = articleStats.total
+  stats.value.publishedArticles = articleStats.published
+  stats.value.draftArticles = articleStats.draft
 }
 
 // 评论操作
@@ -307,6 +477,16 @@ function handleDeleteComment(id: number) {
 function handleAction(action: string) {
   console.log('执行操作:', action)
   alert(`功能开发中: ${action}`)
+}
+
+// 网站配置操作
+function handleSaveSettings(settings: any) {
+  console.log('保存设置:', settings)
+  alert('设置已保存')
+}
+
+function handleResetSettings() {
+  alert('设置已重置')
 }
 </script>
 
@@ -456,6 +636,8 @@ function handleAction(action: string) {
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .topbar-left {

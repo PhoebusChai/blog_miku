@@ -55,14 +55,14 @@
             </div>
           </div>
 
-          <!-- 音乐组件 -->
-          <div class="widget-item widget-music" :class="{ 'is-playing': music.isPlaying }" @click="toggleMusic">
+          <!-- 网站存在天数 -->
+          <div class="widget-item widget-days">
             <div class="widget-content">
-              <span class="widget-label">{{ music.artist }}</span>
-              <span class="widget-value">{{ music.title }}</span>
+              <span class="widget-label">网站已运行</span>
+              <span class="widget-value">{{ siteDays }} 天</span>
             </div>
             <div class="widget-icon">
-              <Music :size="24" />
+              <Calendar :size="24" />
             </div>
           </div>
 
@@ -103,7 +103,24 @@
             <ArrowRight :size="16" />
           </a>
         </div>
-        <div class="featured-articles">
+        
+        <!-- 加载状态 -->
+        <div v-if="loading" class="featured-loading">
+          <div class="loading-spinner"></div>
+          <span>加载中...</span>
+        </div>
+        
+        <!-- 空状态 -->
+        <div v-else-if="featuredArticles.length === 0" class="featured-empty">
+          <div class="empty-icon">
+            <FileText :size="48" />
+          </div>
+          <p class="empty-text">暂无精选文章</p>
+          <p class="empty-hint">管理员还没有发布文章哦 (｡･ω･｡)</p>
+        </div>
+        
+        <!-- 文章列表 -->
+        <div v-else class="featured-articles">
           <FeaturedArticle
             v-for="article in featuredArticles"
             :key="article.id"
@@ -142,7 +159,18 @@
 
           <section class="latest-section">
             <h2 class="section-title">最新文章</h2>
-            <ArticleList :articles="articles" :loading="loading" />
+            
+            <!-- 空状态 -->
+            <div v-if="!loading && articles.length === 0 && !hasMore" class="articles-empty">
+              <div class="empty-icon">
+                <FileText :size="64" />
+              </div>
+              <p class="empty-text">还没有文章</p>
+              <p class="empty-hint">期待管理员的第一篇文章 ✨</p>
+            </div>
+            
+            <!-- 文章列表 -->
+            <ArticleList v-else :articles="articles" :loading="loading" />
             
             <!-- 加载更多状态 -->
             <div v-if="loadingMore" class="loading-more">
@@ -163,7 +191,7 @@
 
           <div class="sidebar-divider"></div>
 
-          <ArticleHeatmap />
+          <ArticleHeatmap :data="heatmapData" />
 
           <div class="sidebar-divider"></div>
 
@@ -179,7 +207,7 @@
 
           <div class="sidebar-divider"></div>
 
-          <ArticleRanking />
+          <ArticleRanking :articles="rankingArticles" />
         </aside>
       </div>
     </main>
@@ -202,7 +230,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { ArrowDown, ArrowUp, ArrowRight, Clock, Cloud, Music, Users } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, ArrowRight, Clock, Cloud, Calendar, Users, Music, FileText } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import FeaturedArticle from '@/components/article/FeaturedArticle.vue'
@@ -215,7 +243,9 @@ import RecentActivities from '@/components/home/RecentActivities.vue'
 import FriendLinks from '@/components/home/FriendLinks.vue'
 import ArticleRanking from '@/components/home/ArticleRanking.vue'
 import ArticleHeatmap from '@/components/home/ArticleHeatmap.vue'
-import type { Article } from '@/types/article'
+import { getArticleList, getAllTags, getArticleHeatmap, getArticleRanking, getFeaturedArticles } from '@/api/article'
+import { message } from '@/utils/message'
+import type { Article } from '@/api/article'
 
 const articles = ref<Article[]>([])
 const featuredArticles = ref<Article[]>([])
@@ -224,12 +254,12 @@ const loadingMore = ref(false)
 const hasMore = ref(true)
 const currentPage = ref(1)
 const pageSize = 6
+const totalArticles = ref(0)
 const showBackToTop = ref(false)
 
-const popularTags = ref([
-  'Vue', 'TypeScript', 'CSS', 'JavaScript', 'Node.js', 
-  'React', 'Vite', 'Pinia', 'Web Components', 'Performance'
-])
+const popularTags = ref<string[]>([])
+const heatmapData = ref<Record<string, number>>({})
+const rankingArticles = ref<Array<{ id: number; title: string; views: number }>>([])
 
 // 社交链接数据
 const socialLinks = ref([
@@ -281,147 +311,22 @@ const loadingMessages = [
 const currentTime = ref('')
 const currentDate = ref('')
 const weather = ref({ temp: '25', condition: '晴天', location: '北京' })
-const music = ref({ title: '千本樱', artist: '初音ミク', isPlaying: false })
+const siteDays = ref(0)
 const stats = ref({ visits: '1,234', articles: '42', comments: '156' })
+
+// 网站创建日期（请根据实际情况修改）
+const SITE_START_DATE = new Date('2024-01-01')
+
+// 计算网站存在天数
+function calculateSiteDays() {
+  const now = new Date()
+  const diffTime = Math.abs(now.getTime() - SITE_START_DATE.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  siteDays.value = diffDays
+}
 
 let timeInterval: number | null = null
 let progressInterval: number | null = null
-
-// 模拟文章数据库
-const allArticlesData = [
-  {
-    id: 4,
-    title: 'Vite 5.0 新特性全面解读',
-    summary: 'Vite 5.0 带来了许多令人兴奋的新特性，包括性能优化、API 改进等，让我们一起来看看。',
-    cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-20'),
-    tags: ['Vite', 'Build Tools'],
-    views: 654,
-    likes: 45
-  },
-  {
-    id: 5,
-    title: 'Pinia 状态管理最佳实践',
-    summary: '探索 Pinia 在大型项目中的应用，分享状态管理的设计模式和优化技巧。',
-    cover: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-18'),
-    tags: ['Vue', 'Pinia'],
-    views: 543,
-    likes: 38
-  },
-  {
-    id: 6,
-    title: '前端性能优化实战指南',
-    summary: '从加载优化、渲染优化到运行时优化，全方位提升前端应用性能。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-16'),
-    tags: ['Performance', 'Optimization'],
-    views: 789,
-    likes: 67
-  },
-  {
-    id: 7,
-    title: 'Web Components 入门与实践',
-    summary: '学习 Web Components 标准，创建可复用的自定义元素，实现真正的组件化开发。',
-    cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-12'),
-    tags: ['Web Components', 'JavaScript'],
-    views: 432,
-    likes: 29
-  },
-  {
-    id: 8,
-    title: 'React Server Components 详解',
-    summary: 'React Server Components 改变了我们构建应用的方式，了解其工作原理和使用场景。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-08'),
-    tags: ['React', 'SSR'],
-    views: 678,
-    likes: 52
-  },
-  {
-    id: 9,
-    title: 'Node.js 微服务架构实践',
-    summary: '使用 Node.js 构建微服务架构，探讨服务拆分、通信、部署等关键问题。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2024-01-03'),
-    tags: ['Node.js', 'Microservices'],
-    views: 567,
-    likes: 41
-  },
-  {
-    id: 10,
-    title: 'Docker 容器化部署实战',
-    summary: '使用 Docker 容器化部署前端应用，提升开发效率和部署一致性。',
-    cover: 'https://images.unsplash.com/photo-1605745341112-85968b19335b?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-28'),
-    tags: ['Docker', 'DevOps'],
-    views: 423,
-    likes: 35
-  },
-  {
-    id: 11,
-    title: 'GraphQL API 设计指南',
-    summary: '深入理解 GraphQL 的设计理念，构建高效灵活的 API 接口。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-25'),
-    tags: ['GraphQL', 'API'],
-    views: 389,
-    likes: 28
-  },
-  {
-    id: 12,
-    title: 'Tailwind CSS 实用技巧',
-    summary: '掌握 Tailwind CSS 的高级用法，快速构建美观的用户界面。',
-    cover: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-20'),
-    tags: ['CSS', 'Tailwind'],
-    views: 512,
-    likes: 42
-  },
-  {
-    id: 13,
-    title: 'Jest 单元测试最佳实践',
-    summary: '编写高质量的单元测试，提升代码可维护性和稳定性。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-15'),
-    tags: ['Testing', 'Jest'],
-    views: 345,
-    likes: 26
-  },
-  {
-    id: 14,
-    title: 'Webpack 5 配置优化',
-    summary: '优化 Webpack 配置，提升构建速度和打包体积。',
-    cover: '',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-10'),
-    tags: ['Webpack', 'Build Tools'],
-    views: 298,
-    likes: 22
-  },
-  {
-    id: 15,
-    title: 'MongoDB 数据库设计',
-    summary: '学习 MongoDB 的数据建模和查询优化技巧。',
-    cover: 'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=800&h=600&fit=crop',
-    author: '落叶无痕',
-    createdAt: new Date('2023-12-05'),
-    tags: ['MongoDB', 'Database'],
-    views: 267,
-    likes: 19
-  }
-]
 
 function updateTime() {
   const now = new Date()
@@ -437,10 +342,6 @@ function updateTime() {
   })
 }
 
-function toggleMusic() {
-  music.value.isPlaying = !music.value.isPlaying
-}
-
 function scrollToContent() {
   window.scrollTo({
     top: window.innerHeight,
@@ -454,24 +355,60 @@ async function loadMoreArticles() {
 
   loadingMore.value = true
 
-  // 模拟API请求延迟
-  await new Promise(resolve => setTimeout(resolve, 800))
+  try {
+    const result = await getArticleList({
+      page: currentPage.value,
+      pageSize
+    })
 
-  const start = (currentPage.value - 1) * pageSize
-  const end = start + pageSize
-  const newArticles = allArticlesData.slice(start, end)
-
-  if (newArticles.length > 0) {
-    articles.value.push(...newArticles)
-    currentPage.value++
-  }
-
-  // 检查是否还有更多数据
-  if (end >= allArticlesData.length) {
+    if (result.records && result.records.length > 0) {
+      articles.value.push(...result.records)
+      currentPage.value++
+      
+      // 检查是否还有更多数据
+      hasMore.value = articles.value.length < totalArticles.value
+    } else {
+      hasMore.value = false
+    }
+  } catch (error: any) {
+    message.error(error.message || '加载文章失败')
     hasMore.value = false
+  } finally {
+    loadingMore.value = false
   }
+}
 
-  loadingMore.value = false
+// 加载标签
+async function loadTags() {
+  try {
+    const tags = await getAllTags()
+    popularTags.value = tags.slice(0, 10).map(tag => tag.name)
+  } catch (error: any) {
+    console.error('加载标签失败:', error)
+  }
+}
+
+// 加载热力图数据
+async function loadHeatmap() {
+  try {
+    heatmapData.value = await getArticleHeatmap()
+  } catch (error: any) {
+    console.error('加载热力图失败:', error)
+  }
+}
+
+// 加载排行榜数据
+async function loadRanking() {
+  try {
+    const data = await getArticleRanking(5)
+    rankingArticles.value = data.map(item => ({
+      id: item.id,
+      title: item.title,
+      views: item.viewCount
+    }))
+  } catch (error: any) {
+    console.error('加载排行榜失败:', error)
+  }
 }
 
 // 监听滚动事件
@@ -500,9 +437,13 @@ function scrollToTop() {
 onMounted(async () => {
   loading.value = true
   
-  // 更新时间
+  // 更新时间和网站天数
   updateTime()
-  timeInterval = window.setInterval(updateTime, 1000)
+  calculateSiteDays()
+  timeInterval = window.setInterval(() => {
+    updateTime()
+    calculateSiteDays()
+  }, 1000)
   
   // 模拟图片加载进度（开发环境固定3秒）
   const loadDuration = 3000 // 3秒
@@ -529,50 +470,37 @@ onMounted(async () => {
     }
   }, updateInterval)
   
-  // 模拟加载文章数据
-  setTimeout(() => {
-    // 精选文章数据
-    featuredArticles.value = [
-      {
-        id: 1,
-        title: 'Vue 3 Composition API 深度解析',
-        summary: '深入探讨 Vue 3 Composition API 的设计理念和最佳实践，帮助你更好地理解和使用这个强大的特性。',
-        cover: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&h=600&fit=crop',
-        author: '落叶无痕',
-        createdAt: new Date('2024-01-15'),
-        tags: ['Vue', 'TypeScript'],
-        views: 1234,
-        likes: 89
-      },
-      {
-        id: 2,
-        title: 'TypeScript 类型体操实战',
-        summary: '通过实际案例学习 TypeScript 高级类型技巧，提升类型编程能力，写出更安全的代码。',
-        cover: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&h=600&fit=crop',
-        author: '落叶无痕',
-        createdAt: new Date('2024-01-10'),
-        tags: ['TypeScript', 'JavaScript'],
-        views: 987,
-        likes: 76
-      },
-      {
-        id: 3,
-        title: 'CSS 现代布局技术指南',
-        summary: '全面介绍 Flexbox、Grid、Container Queries 等现代 CSS 布局技术，打造响应式页面。',
-        cover: 'https://images.unsplash.com/photo-1507721999472-8ed4421c4af2?w=800&h=600&fit=crop',
-        author: '落叶无痕',
-        createdAt: new Date('2024-01-05'),
-        tags: ['CSS', 'Web Design'],
-        views: 856,
-        likes: 65
-      }
-    ]
-
-    // 加载第一页文章
-    loadMoreArticles()
+  // 加载真实数据
+  try {
+    // 加载标签
+    await loadTags()
     
+    // 加载热力图数据
+    loadHeatmap()
+    
+    // 加载排行榜数据
+    loadRanking()
+    
+    // 加载精选文章（置顶文章或浏览数最多的文章）
+    const featured = await getFeaturedArticles(3)
+    featuredArticles.value = featured
+    
+    // 加载最新文章列表
+    const result = await getArticleList({ page: 1, pageSize })
+    
+    if (result.records && result.records.length > 0) {
+      articles.value = result.records
+      totalArticles.value = result.total
+      currentPage.value = 2
+      
+      // 检查是否还有更多
+      hasMore.value = articles.value.length < result.total
+    }
+  } catch (error: any) {
+    message.error(error.message || '加载数据失败')
+  } finally {
     loading.value = false
-  }, 1000)
+  }
 
   // 添加滚动监听
   window.addEventListener('scroll', handleScroll)
@@ -922,13 +850,9 @@ onUnmounted(() => {
   transform: scale(1.05) rotate(5deg);
 }
 
-/* 音乐组件特殊样式 */
-.widget-music.is-playing .widget-icon {
+/* 网站天数组件特殊样式 */
+.widget-days:hover .widget-icon {
   animation: pulse 1.5s ease-in-out infinite;
-}
-
-.widget-music.is-playing {
-  border-color: var(--color-miku-400);
 }
 
 @keyframes pulse {
@@ -1058,7 +982,7 @@ onUnmounted(() => {
 
 .featured-articles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--spacing-xl);
 }
 
@@ -1651,6 +1575,12 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 1024px) {
+  .featured-articles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .home__main {
     padding: var(--spacing-2xl) max(4vw, 90px); /* 移动端左右边距相同 */
@@ -1679,6 +1609,109 @@ onUnmounted(() => {
   }
   50% {
     transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* 精选文章加载和空状态 */
+.featured-loading,
+.featured-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-2xl);
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+}
+
+.featured-loading {
+  gap: var(--spacing-lg);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.featured-loading span {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+}
+
+.featured-empty,
+.articles-empty {
+  text-align: center;
+}
+
+.empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-lg);
+}
+
+.empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.empty-text {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-600);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.empty-hint {
+  font-size: var(--text-sm);
+  color: var(--color-gray-400);
+  margin: 0;
+}
+
+/* 最新文章空状态 */
+.articles-empty {
+  padding: var(--spacing-3xl) var(--spacing-2xl);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  margin: var(--spacing-xl) 0;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .featured-empty,
+  .articles-empty {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+    min-height: 200px;
+  }
+
+  .empty-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .empty-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .empty-text {
+    font-size: var(--text-sm);
+  }
+
+  .empty-hint {
+    font-size: var(--text-xs);
   }
 }
 </style>

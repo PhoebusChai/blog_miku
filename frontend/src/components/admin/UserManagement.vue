@@ -35,7 +35,9 @@
             type="text"
             placeholder="搜索用户名或邮箱..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
       </div>
       <div class="action-bar-right">
@@ -60,7 +62,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in filteredUsers" :key="user.id" class="user-row">
+          <tr v-for="user in paginatedUsers" :key="user.id" class="user-row">
             <td class="col-user">
               <div class="user-cell">
                 <div class="user-avatar">
@@ -132,6 +134,33 @@
         <p>暂无用户</p>
       </div>
     </div>
+
+    <!-- 分页 -->
+    <div v-if="filteredUsers.length > 0" class="pagination">
+      <div class="pagination-info">共 {{ filteredUsers.length }} 条，每页 {{ pageSize }} 条</div>
+      <div class="pagination-controls">
+        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
+          <ChevronLeft :size="16" />
+        </button>
+        <button
+          v-for="page in displayPages"
+          :key="page"
+          class="pagination-btn"
+          :class="{ active: page === currentPage }"
+          :disabled="typeof page === 'string'"
+          @click="typeof page === 'number' && (currentPage = page)"
+        >
+          {{ page }}
+        </button>
+        <button
+          class="pagination-btn"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          <ChevronRight :size="16" />
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -147,7 +176,9 @@ import {
   Ban,
   CheckCircle,
   FileText,
-  MessageSquare
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
 
 // Emits
@@ -162,6 +193,8 @@ const emit = defineEmits<{
 // 状态
 const activeTab = ref('all')
 const searchKeyword = ref('')
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 // Mock 数据
 const users = ref([
@@ -220,6 +253,51 @@ const filteredUsers = computed(() => {
   return result
 })
 
+// 分页
+const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize.value))
+
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredUsers.value.slice(start, end)
+})
+
+const displayPages = computed(() => {
+  const pages: (number | string)[] = []
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+
+  return pages
+})
+
 // 方法
 function getRoleText(role: number): string {
   const roleMap: Record<number, string> = {
@@ -260,6 +338,11 @@ function handleDelete(id: number) {
     emit('delete', id)
   }
 }
+
+function handleSearch() {
+  // 搜索逻辑已通过 computed 自动处理
+  console.log('搜索关键词:', searchKeyword.value)
+}
 </script>
 
 <style scoped>
@@ -267,6 +350,7 @@ function handleDelete(id: number) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width:100%;
   min-height: 0;
 }
 
@@ -274,7 +358,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
 }
@@ -353,6 +437,24 @@ function handleDelete(id: number) {
 
 .search-input::placeholder {
   color: var(--color-gray-400);
+}
+
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
 }
 
 .primary-btn {
@@ -622,5 +724,57 @@ function handleDelete(id: number) {
 .empty-state p {
   margin: 0;
   font-size: var(--text-base);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) 2%;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.pagination-info {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.pagination-btn {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-700);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--color-miku-500);
+  color: var(--color-miku-600);
+}
+
+.pagination-btn.active {
+  background: var(--color-miku-500);
+  border-color: var(--color-miku-500);
+  color: var(--color-white);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

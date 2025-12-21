@@ -7,7 +7,7 @@
         v-for="article in articles"
         :key="article.id"
         :article="article"
-        :show-image="!!article.cover"
+        :show-image="!!article.coverImage"
       />
     </div>
   </section>

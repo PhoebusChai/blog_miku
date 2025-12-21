@@ -108,7 +108,7 @@ const isScrolled = ref(false)
 const userStore = useUserStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const currentUser = computed(() => userStore.user)
-const isAdmin = computed(() => currentUser.value?.role === 'admin')
+const isAdmin = computed(() => currentUser.value?.role === 1)
 
 function handleScroll() {
   isScrolled.value = window.scrollY > 50

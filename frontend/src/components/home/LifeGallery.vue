@@ -1,13 +1,25 @@
 <template>
-  <div class="life-gallery">
-    <div class="life-item" v-for="photo in photos" :key="photo.id">
-      <div class="photo-frame">
-        <div class="photo-image">
-          <img :src="photo.url" :alt="photo.location" loading="lazy" />
-        </div>
-        <div class="photo-caption">
-          <p class="photo-location">{{ photo.location }}</p>
-          <p class="photo-date">{{ photo.date }}</p>
+  <div class="life-gallery-wrapper">
+    <!-- 空状态 -->
+    <div v-if="photos.length === 0" class="life-empty">
+      <div class="life-empty-icon">
+        <Image :size="48" />
+      </div>
+      <p class="life-empty-text">暂无照片</p>
+      <p class="life-empty-hint">期待分享生活的美好瞬间 ✨</p>
+    </div>
+
+    <!-- 照片列表 -->
+    <div v-else class="life-gallery">
+      <div class="life-item" v-for="photo in photos" :key="photo.id">
+        <div class="photo-frame">
+          <div class="photo-image">
+            <img :src="photo.url" :alt="photo.location" loading="lazy" />
+          </div>
+          <div class="photo-caption">
+            <p class="photo-location">{{ photo.location }}</p>
+            <p class="photo-date">{{ photo.date }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -16,6 +28,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Image } from 'lucide-vue-next'
 
 interface Photo {
   id: number
@@ -24,59 +37,63 @@ interface Photo {
   date: string
 }
 
-const photos = ref<Photo[]>([
-  {
-    id: 1,
-    url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=500&fit=crop',
-    location: '喜马拉雅山脉',
-    date: '2024.01.15'
-  },
-  {
-    id: 2,
-    url: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&h=300&fit=crop',
-    location: '马尔代夫',
-    date: '2024.01.12'
-  },
-  {
-    id: 3,
-    url: 'https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=400&h=450&fit=crop',
-    location: '咖啡馆',
-    date: '2024.01.10'
-  },
-  {
-    id: 4,
-    url: 'https://images.unsplash.com/photo-1495954484750-af469f2f9be5?w=400&h=350&fit=crop',
-    location: '图书馆',
-    date: '2024.01.08'
-  },
-  {
-    id: 5,
-    url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=550&fit=crop',
-    location: '挪威峡湾',
-    date: '2024.01.05'
-  },
-  {
-    id: 6,
-    url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=400&fit=crop',
-    location: '新西兰',
-    date: '2024.01.03'
-  },
-  {
-    id: 7,
-    url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400&h=480&fit=crop',
-    location: '森林深处',
-    date: '2023.12.28'
-  },
-  {
-    id: 8,
-    url: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&h=320&fit=crop',
-    location: '湖畔小屋',
-    date: '2023.12.25'
-  }
-])
+interface Props {
+  photos?: Photo[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  photos: () => []
+})
+
+const photos = ref<Photo[]>(props.photos)
 </script>
 
 <style scoped>
+.life-gallery-wrapper {
+  width: 100%;
+}
+
+/* 空状态 */
+.life-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-2xl);
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.life-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-lg);
+}
+
+.life-empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.life-empty-text {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-600);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.life-empty-hint {
+  font-size: var(--text-sm);
+  color: var(--color-gray-400);
+  margin: 0;
+}
+
 .life-gallery {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -245,6 +262,21 @@ const photos = ref<Photo[]>([
     bottom: 8px;
     left: 8px;
     right: 8px;
+  }
+
+  .life-empty {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+    min-height: 220px;
+  }
+
+  .life-empty-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .life-empty-icon svg {
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

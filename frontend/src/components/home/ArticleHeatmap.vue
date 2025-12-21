@@ -149,10 +149,8 @@ const heatmapData = computed<HeatmapCell[]>(() => {
       const day = String(date.getDate()).padStart(2, '0')
       const dateStr = `${year}-${month}-${day}`
       
-      // 优先使用传入的数据，否则生成随机数据
-      const count = props.data[dateStr] !== undefined 
-        ? props.data[dateStr] 
-        : (Math.random() > 0.8 ? Math.floor(Math.random() * 5) : 0)
+      // 只使用传入的数据，不生成随机数据
+      const count = props.data[dateStr] || 0
       
       // 根据文章数量计算等级 (0-4)
       let level = 0

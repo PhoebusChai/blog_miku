@@ -63,13 +63,14 @@
             </button>
             <button
               v-for="tag in allTags"
-              :key="tag"
+              :key="tag.id"
               class="filter-tag-btn"
-              :class="{ 'is-active': selectedTags.includes(tag) }"
-              @click="toggleTag(tag)"
+              :class="{ 'is-active': selectedTags.includes(tag.id) }"
+              @click="toggleTag(tag.id)"
             >
-              <span class="tag-text">{{ tag }}</span>
-              <span v-if="selectedTags.includes(tag)" class="tag-check">
+              <span class="tag-text">{{ tag.name }}</span>
+              <span class="tag-count">({{ tag.articleCount }})</span>
+              <span v-if="selectedTags.includes(tag.id)" class="tag-check">
                 <Check :size="12" />
               </span>
             </button>
@@ -121,17 +122,17 @@
                 v-for="article in group"
                 :key="article.id"
                 class="article-item"
-                :class="{ 'has-cover': article.cover }"
+                :class="{ 'has-cover': article.coverImage }"
                 @click="goToArticle(article.id)"
               >
                 <div class="article-main">
                   <div class="article-date">
-                    <span class="date-text">{{ formatFullDate(article.createdAt) }}</span>
+                    <span class="date-text">{{ formatFullDate(article.publishedAt || article.createdAt) }}</span>
                   </div>
                   
                   <!-- 封面图片 -->
-                  <div v-if="article.cover" class="article-cover">
-                    <img :src="article.cover" :alt="article.title" />
+                  <div v-if="article.coverImage" class="article-cover">
+                    <img :src="article.coverImage" :alt="article.title" />
                   </div>
                   
                   <div class="article-content">
@@ -142,17 +143,17 @@
                       <div class="article-meta">
                         <span class="meta-item">
                           <Eye :size="14" />
-                          {{ article.views }}
+                          {{ article.viewCount || 0 }}
                         </span>
                         <span class="meta-item">
                           <Heart :size="14" />
-                          {{ article.likes }}
+                          {{ article.likeCount || 0 }}
                         </span>
                       </div>
                       
                       <div v-if="article.tags && article.tags.length" class="article-tags">
-                        <span v-for="tag in article.tags" :key="tag" class="tag">
-                          {{ tag }}
+                        <span v-for="tag in article.tags" :key="tag.id" class="tag">
+                          {{ tag.name }}
                         </span>
                       </div>
                     </div>
@@ -183,13 +184,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Search, X, Tag, Calendar, Eye, Heart, FileX, ArrowUp, Check, Sparkles 
 } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import { getArchiveArticles, getAllTags } from '@/api/article'
+import type { Article } from '@/api/article'
+import { message } from '@/utils/message'
 
 const router = useRouter()
 const loading = ref(true)
@@ -197,247 +201,88 @@ const showBackToTop = ref(false)
 
 // 搜索和筛选状态
 const searchQuery = ref('')
-const selectedTags = ref<string[]>([]) // 支持多选
+const selectedTags = ref<number[]>([]) // 存储标签ID
 const sortBy = ref<'date-desc' | 'date-asc' | 'views' | 'likes'>('date-desc')
 
 // 排序选项
 const sortOptions = [
-  { label: '最新发布', value: 'date-desc' },
-  { label: '最早发布', value: 'date-asc' },
-  { label: '最多浏览', value: 'views' },
-  { label: '最多点赞', value: 'likes' }
+  { label: '最新发布', value: 'date-desc' as const },
+  { label: '最早发布', value: 'date-asc' as const },
+  { label: '最多浏览', value: 'views' as const },
+  { label: '最多点赞', value: 'likes' as const }
 ]
 
-// Mock 数据
-const allArticles = ref([
-  {
-    id: 1,
-    title: 'Vue 3 Composition API 深度解析',
-    summary: '深入探讨 Vue 3 Composition API 的设计理念和最佳实践，帮助你更好地理解和使用这个强大的特性。',
-    category: '技术分享',
-    tags: ['Vue', 'TypeScript', 'Frontend'],
-    createdAt: '2024-01-15',
-    views: 1234,
-    likes: 89,
-    cover: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&h=600&fit=crop'
-  },
-  {
-    id: 2,
-    title: 'TypeScript 类型体操实战',
-    summary: '通过实际案例学习 TypeScript 高级类型技巧，提升类型编程能力。',
-    category: '技术分享',
-    tags: ['TypeScript', 'JavaScript'],
-    createdAt: '2024-01-10',
-    views: 987,
-    likes: 76,
-    cover: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&h=600&fit=crop'
-  },
-  {
-    id: 3,
-    title: 'CSS 现代布局技术指南',
-    summary: '全面介绍 Flexbox、Grid、Container Queries 等现代 CSS 布局技术。',
-    category: '技术分享',
-    tags: ['CSS', 'Web Design'],
-    createdAt: '2024-01-05',
-    views: 856,
-    likes: 65,
-    cover: 'https://images.unsplash.com/photo-1507721999472-8ed4421c4af2?w=800&h=600&fit=crop'
-  },
-  {
-    id: 4,
-    title: 'Vite 5.0 新特性全面解读',
-    summary: 'Vite 5.0 带来了许多令人兴奋的新特性，包括性能优化、API 改进等。',
-    category: '技术分享',
-    tags: ['Vite', 'Build Tools'],
-    createdAt: '2023-12-28',
-    views: 654,
-    likes: 45,
-    cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=600&fit=crop'
-  },
-  {
-    id: 5,
-    title: 'Pinia 状态管理最佳实践',
-    summary: '探索 Pinia 在大型项目中的应用，分享状态管理的设计模式和优化技巧。',
-    category: '技术分享',
-    tags: ['Vue', 'Pinia', 'State Management'],
-    createdAt: '2023-12-20',
-    views: 543,
-    likes: 38
-  },
-  {
-    id: 6,
-    title: '前端性能优化实战指南',
-    summary: '从加载优化、渲染优化到运行时优化，全方位提升前端应用性能。',
-    category: '技术分享',
-    tags: ['Performance', 'Optimization'],
-    createdAt: '2023-12-15',
-    views: 789,
-    likes: 67
-  },
-  {
-    id: 7,
-    title: '2023年终总结：技术成长之路',
-    summary: '回顾这一年的技术学习历程，分享成长经验和未来规划。',
-    category: '生活随笔',
-    tags: ['年终总结', '个人成长'],
-    createdAt: '2023-12-31',
-    views: 432,
-    likes: 29
-  },
-  {
-    id: 8,
-    title: 'React Server Components 详解',
-    summary: 'React Server Components 改变了我们构建应用的方式，了解其工作原理和使用场景。',
-    category: '技术分享',
-    tags: ['React', 'SSR'],
-    createdAt: '2023-11-25',
-    views: 678,
-    likes: 52
-  },
-  {
-    id: 9,
-    title: 'Node.js 微服务架构实践',
-    summary: '使用 Node.js 构建微服务架构，探讨服务拆分、通信、部署等关键问题。',
-    category: '技术分享',
-    tags: ['Node.js', 'Microservices'],
-    createdAt: '2023-11-18',
-    views: 567,
-    likes: 41
-  },
-  {
-    id: 10,
-    title: '秋日京都游记',
-    summary: '记录在京都的美好时光，感受古都的秋日风情。',
-    category: '生活随笔',
-    tags: ['旅行', '摄影'],
-    createdAt: '2023-11-10',
-    views: 345,
-    likes: 28
-  },
-  {
-    id: 11,
-    title: 'Docker 容器化部署实战',
-    summary: '使用 Docker 容器化部署前端应用，提升开发效率和部署一致性。',
-    category: '技术分享',
-    tags: ['Docker', 'DevOps'],
-    createdAt: '2023-10-28',
-    views: 423,
-    likes: 35
-  },
-  {
-    id: 12,
-    title: 'GraphQL API 设计指南',
-    summary: '深入理解 GraphQL 的设计理念，构建高效灵活的 API 接口。',
-    category: '技术分享',
-    tags: ['GraphQL', 'API'],
-    createdAt: '2023-10-15',
-    views: 389,
-    likes: 28
-  },
-  {
-    id: 13,
-    title: '个人博客搭建记录',
-    summary: '从零开始搭建个人博客，记录技术选型和实现过程。',
-    category: '项目展示',
-    tags: ['Vue', 'Blog'],
-    createdAt: '2023-10-05',
-    views: 512,
-    likes: 42
-  },
-  {
-    id: 14,
-    title: 'Tailwind CSS 实用技巧',
-    summary: '掌握 Tailwind CSS 的高级用法，快速构建美观的用户界面。',
-    category: '技术分享',
-    tags: ['CSS', 'Tailwind'],
-    createdAt: '2023-09-20',
-    views: 298,
-    likes: 22
-  },
-  {
-    id: 15,
-    title: '夏日海边随想',
-    summary: '在海边度过的悠闲时光，记录生活中的美好瞬间。',
-    category: '生活随笔',
-    tags: ['生活', '随笔'],
-    createdAt: '2023-08-15',
-    views: 267,
-    likes: 19
-  }
-])
-
-// 所有标签
-const allTags = computed(() => {
-  const tags = new Set<string>()
-  allArticles.value.forEach(article => {
-    article.tags.forEach(tag => tags.add(tag))
-  })
-  return Array.from(tags).sort()
-})
+// 数据
+const allArticles = ref<Article[]>([])
+const allTags = ref<Array<{ id: number; name: string; slug: string; articleCount: number }>>([])
 
 // 是否有活动筛选
 const hasActiveFilters = computed(() => {
   return !!(searchQuery.value || selectedTags.value.length > 0)
 })
 
-// 筛选后的文章
+// 筛选后的文章（前端再次筛选搜索关键词）
 const filteredArticles = computed(() => {
   let result = [...allArticles.value]
 
-  // 搜索筛选
+  // 前端搜索筛选（实时）
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(article =>
       article.title.toLowerCase().includes(query) ||
-      article.summary.toLowerCase().includes(query)
+      (article.summary && article.summary.toLowerCase().includes(query))
     )
   }
-
-  // 标签筛选 - 支持多选（文章需包含所有选中的标签）
-  if (selectedTags.value.length > 0) {
-    result = result.filter(article => 
-      selectedTags.value.every(tag => article.tags.includes(tag))
-    )
-  }
-
-  // 排序
-  result.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'date-desc':
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      case 'date-asc':
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      case 'views':
-        return b.views - a.views
-      case 'likes':
-        return b.likes - a.likes
-      default:
-        return 0
-    }
-  })
 
   return result
 })
 
 // 按年份分组
 const groupedArticles = computed(() => {
-  const groups: Record<string, typeof allArticles.value> = {}
+  const groups: Record<string, Article[]> = {}
   
   filteredArticles.value.forEach(article => {
-    const year = new Date(article.createdAt).getFullYear().toString()
-    if (!groups[year]) {
-      groups[year] = []
+    const date = article.publishedAt || article.createdAt
+    if (date) {
+      const year = new Date(date).getFullYear().toString()
+      if (!groups[year]) {
+        groups[year] = []
+      }
+      groups[year].push(article)
     }
-    groups[year].push(article)
   })
   
   return groups
 })
 
-// 文章总数
-const totalArticles = computed(() => allArticles.value.length)
+// 加载文章数据
+async function loadArticles() {
+  try {
+    loading.value = true
+    const data = await getArchiveArticles({
+      tagIds: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+      sortBy: sortBy.value
+    })
+    allArticles.value = data
+  } catch (error) {
+    console.error('加载文章失败:', error)
+    message.error('加载文章失败')
+  } finally {
+    loading.value = false
+  }
+}
 
-// 搜索处理
+// 加载标签数据
+async function loadTags() {
+  try {
+    const data = await getAllTags()
+    allTags.value = data
+  } catch (error) {
+    console.error('加载标签失败:', error)
+  }
+}
+
+// 搜索处理（实时搜索，不需要重新加载）
 function handleSearch() {
   // 实时搜索，无需额外处理
 }
@@ -447,32 +292,38 @@ function clearSearch() {
 }
 
 // 标签筛选 - 支持多选
-function toggleTag(tag: string) {
-  const index = selectedTags.value.indexOf(tag)
+function toggleTag(tagId: number) {
+  const index = selectedTags.value.indexOf(tagId)
   if (index > -1) {
     selectedTags.value.splice(index, 1)
   } else {
-    selectedTags.value.push(tag)
+    selectedTags.value.push(tagId)
   }
+  // 标签变化时重新加载
+  loadArticles()
 }
 
 function clearTags() {
   selectedTags.value = []
+  loadArticles()
 }
 
 // 排序
 function selectSort(sort: typeof sortBy.value) {
   sortBy.value = sort
+  loadArticles()
 }
 
 // 清除所有筛选
 function clearAllFilters() {
   searchQuery.value = ''
   selectedTags.value = []
+  loadArticles()
 }
 
 // 日期格式化
-function formatFullDate(date: string) {
+function formatFullDate(date?: string) {
+  if (!date) return ''
   return new Date(date).toLocaleDateString('zh-CN', { 
     month: 'long', 
     day: 'numeric' 
@@ -480,8 +331,10 @@ function formatFullDate(date: string) {
 }
 
 // 跳转到文章详情
-function goToArticle(id: number) {
-  router.push(`/article/${id}`)
+function goToArticle(id?: number) {
+  if (id) {
+    router.push(`/article/${id}`)
+  }
 }
 
 // 滚动处理
@@ -497,11 +350,8 @@ function scrollToTop() {
 }
 
 onMounted(() => {
-  // 模拟加载
-  setTimeout(() => {
-    loading.value = false
-  }, 500)
-
+  loadArticles()
+  loadTags()
   window.addEventListener('scroll', handleScroll)
 })
 
@@ -778,6 +628,12 @@ onUnmounted(() => {
 
 .tag-text {
   line-height: 1;
+}
+
+.tag-count {
+  font-size: var(--text-xs);
+  color: var(--color-gray-400);
+  margin-left: 2px;
 }
 
 .tag-check {

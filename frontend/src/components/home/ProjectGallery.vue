@@ -1,14 +1,26 @@
 <template>
-  <div class="project-gallery">
-    <div class="project-card" v-for="project in projects" :key="project.id">
-      <div class="project-icon">
-        <component :is="project.icon" :size="32" />
+  <div class="project-gallery-wrapper">
+    <!-- 空状态 -->
+    <div v-if="projects.length === 0" class="project-empty">
+      <div class="project-empty-icon">
+        <FolderOpen :size="48" />
       </div>
-      <div class="project-content">
-        <h4 class="project-title">{{ project.title }}</h4>
-        <p class="project-desc">{{ project.description }}</p>
-        <div class="project-tags">
-          <span v-for="tag in project.tags" :key="tag" class="project-tag">{{ tag }}</span>
+      <p class="project-empty-text">暂无项目</p>
+      <p class="project-empty-hint">敬请期待精彩项目 (๑•̀ㅂ•́)و✧</p>
+    </div>
+
+    <!-- 项目列表 -->
+    <div v-else class="project-gallery">
+      <div class="project-card" v-for="project in projects" :key="project.id">
+        <div class="project-icon">
+          <component :is="project.icon" :size="32" />
+        </div>
+        <div class="project-content">
+          <h4 class="project-title">{{ project.title }}</h4>
+          <p class="project-desc">{{ project.description }}</p>
+          <div class="project-tags">
+            <span v-for="tag in project.tags" :key="tag" class="project-tag">{{ tag }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -17,7 +29,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Code2, Layout, BarChart3, Terminal, Palette, Database } from 'lucide-vue-next'
+import { FolderOpen } from 'lucide-vue-next'
 
 interface Project {
   id: number
@@ -27,53 +39,63 @@ interface Project {
   tags: string[]
 }
 
-const projects = ref<Project[]>([
-  {
-    id: 1,
-    title: '个人博客系统',
-    description: 'Vue 3 + TypeScript 构建的现代化博客',
-    icon: Layout,
-    tags: ['Vue', 'TypeScript']
-  },
-  {
-    id: 2,
-    title: '任务管理工具',
-    description: '高效的团队协作平台',
-    icon: Code2,
-    tags: ['React', 'Node.js']
-  },
-  {
-    id: 3,
-    title: '数据可视化看板',
-    description: '实时数据分析与展示',
-    icon: BarChart3,
-    tags: ['D3.js', 'ECharts']
-  },
-  {
-    id: 4,
-    title: '在线代码编辑器',
-    description: '支持多语言的Web IDE',
-    icon: Terminal,
-    tags: ['Monaco', 'WebSocket']
-  },
-  {
-    id: 5,
-    title: 'UI组件库',
-    description: '轻量级的组件库',
-    icon: Palette,
-    tags: ['Vue', 'CSS']
-  },
-  {
-    id: 6,
-    title: 'API管理平台',
-    description: 'RESTful API文档与测试',
-    icon: Database,
-    tags: ['Express', 'Swagger']
-  }
-])
+interface Props {
+  projects?: Project[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  projects: () => []
+})
+
+const projects = ref<Project[]>(props.projects)
 </script>
 
 <style scoped>
+.project-gallery-wrapper {
+  width: 100%;
+}
+
+/* 空状态 */
+.project-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-2xl);
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.project-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, rgba(57, 197, 187, 0.1), rgba(57, 197, 187, 0.05));
+  border-radius: 50%;
+  margin-bottom: var(--spacing-lg);
+}
+
+.project-empty-icon svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.project-empty-text {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-600);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.project-empty-hint {
+  font-size: var(--text-sm);
+  color: var(--color-gray-400);
+  margin: 0;
+}
+
 .project-gallery {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -187,6 +209,21 @@ const projects = ref<Project[]>([
   
   .project-card {
     flex-direction: column;
+  }
+
+  .project-empty {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+    min-height: 220px;
+  }
+
+  .project-empty-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .project-empty-icon svg {
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

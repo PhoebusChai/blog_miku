@@ -16,7 +16,9 @@
             type="text"
             placeholder="搜索图片名称..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
         <select v-model="categoryFilter" class="filter-select">
           <option value="">全部分类</option>
@@ -26,6 +28,24 @@
         </select>
       </div>
       <div class="action-bar-right">
+        <div class="view-toggle">
+          <button
+            class="view-btn"
+            :class="{ active: viewMode === 'grid' }"
+            title="网格视图"
+            @click="viewMode = 'grid'"
+          >
+            <Grid :size="18" />
+          </button>
+          <button
+            class="view-btn"
+            :class="{ active: viewMode === 'list' }"
+            title="列表视图"
+            @click="viewMode = 'list'"
+          >
+            <List :size="18" />
+          </button>
+        </div>
         <button class="primary-btn" @click="handleUpload">
           <Upload :size="18" />
           <span>上传图片</span>
@@ -33,10 +53,10 @@
       </div>
     </div>
 
-    <!-- 图片网格 -->
-    <div class="gallery-grid-wrapper">
+    <!-- 图片网格视图 -->
+    <div v-if="viewMode === 'grid'" class="gallery-grid-wrapper">
       <div class="gallery-grid">
-        <div v-for="image in filteredImages" :key="image.id" class="image-card">
+        <div v-for="image in paginatedImages" :key="image.id" class="image-card">
           <div class="image-preview">
             <img :src="image.imageUrl" :alt="image.title" />
             <div class="image-overlay">
@@ -71,24 +91,125 @@
         </button>
       </div>
     </div>
+
+    <!-- 图片列表视图 -->
+    <div v-else class="gallery-list-wrapper">
+      <table class="gallery-table">
+        <thead>
+          <tr>
+            <th class="col-preview">预览</th>
+            <th class="col-name">名称</th>
+            <th class="col-category">分类</th>
+            <th class="col-size">尺寸</th>
+            <th class="col-date">上传时间</th>
+            <th class="col-actions">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="image in paginatedImages" :key="image.id" class="image-row">
+            <td class="col-preview">
+              <div class="preview-thumbnail">
+                <img :src="image.thumbnailUrl" :alt="image.title" />
+              </div>
+            </td>
+            <td class="col-name">
+              <div class="name-cell">
+                <div class="image-title">{{ image.title }}</div>
+                <div class="image-description">{{ image.description }}</div>
+              </div>
+            </td>
+            <td class="col-category">
+              <span class="category-badge">{{ image.category }}</span>
+            </td>
+            <td class="col-size">{{ image.size || '未知' }}</td>
+            <td class="col-date">{{ image.createdAt }}</td>
+            <td class="col-actions">
+              <div class="actions-cell">
+                <button class="action-icon-btn" title="查看" @click="handleView(image.id)">
+                  <Eye :size="16" />
+                </button>
+                <button
+                  class="action-icon-btn"
+                  title="复制链接"
+                  @click="handleCopy(image.imageUrl)"
+                >
+                  <Copy :size="16" />
+                </button>
+                <button class="action-icon-btn" title="删除" @click="handleDelete(image.id)">
+                  <Trash2 :size="16" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 空状态 -->
+      <div v-if="filteredImages.length === 0" class="empty-state">
+        <Image :size="48" class="empty-icon" />
+        <p>暂无图片</p>
+        <button class="primary-btn" @click="handleUpload">
+          <Upload :size="18" />
+          <span>上传第一张图片</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 分页 -->
+    <div v-if="filteredImages.length > 0" class="pagination">
+      <div class="pagination-info">共 {{ filteredImages.length }} 条，每页 {{ pageSize }} 条</div>
+      <div class="pagination-controls">
+        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
+          <ChevronLeft :size="16" />
+        </button>
+        <button
+          v-for="page in displayPages"
+          :key="page"
+          class="pagination-btn"
+          :class="{ active: page === currentPage }"
+          :disabled="typeof page === 'string'"
+          @click="typeof page === 'number' && (currentPage = page)"
+        >
+          {{ page }}
+        </button>
+        <button
+          class="pagination-btn"
+          :disabled="currentPage === totalPages"
+          @click="currentPage++"
+        >
+          <ChevronRight :size="16" />
+        </button>
+      </div>
+    </div>
+
+    <!-- 图片上传弹窗 -->
+    <ImageUploadModal :visible="showModal" @close="showModal = false" @submit="handleModalSubmit" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Search, Upload, Eye, Copy, Trash2, Image } from 'lucide-vue-next'
-
-// Emits
-const emit = defineEmits<{
-  upload: []
-  view: [id: number]
-  copy: [url: string]
-  delete: [id: number]
-}>()
+import {
+  Search,
+  Upload,
+  Eye,
+  Copy,
+  Trash2,
+  Image,
+  Grid,
+  List,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-vue-next'
+import ImageUploadModal from './ImageUploadModal.vue'
 
 // 状态
 const searchKeyword = ref('')
 const categoryFilter = ref('')
+const viewMode = ref<'grid' | 'list'>('grid')
+const currentPage = ref(1)
+const pageSize = ref(12)
+const showModal = ref(false)
 
 // Mock 数据
 const images = ref([
@@ -99,7 +220,8 @@ const images = ref([
     imageUrl: 'https://via.placeholder.com/300',
     thumbnailUrl: 'https://via.placeholder.com/150',
     category: '头像',
-    status: 1, // 0-隐藏，1-显示，2-删除
+    size: '300x300',
+    status: 1,
     createdAt: '2024-12-19'
   },
   {
@@ -109,6 +231,7 @@ const images = ref([
     imageUrl: 'https://via.placeholder.com/800x400',
     thumbnailUrl: 'https://via.placeholder.com/400x200',
     category: '横幅',
+    size: '800x400',
     status: 1,
     createdAt: '2024-12-18'
   },
@@ -119,6 +242,7 @@ const images = ref([
     imageUrl: 'https://via.placeholder.com/600x400',
     thumbnailUrl: 'https://via.placeholder.com/300x200',
     category: '文章配图',
+    size: '600x400',
     status: 1,
     createdAt: '2024-12-17'
   }
@@ -144,25 +268,95 @@ const filteredImages = computed(() => {
   return result
 })
 
+// 分页
+const totalPages = computed(() => Math.ceil(filteredImages.value.length / pageSize.value))
+
+const paginatedImages = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredImages.value.slice(start, end)
+})
+
+const displayPages = computed(() => {
+  const pages: (number | string)[] = []
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+
+  return pages
+})
+
 // 方法
+function handleSearch() {
+  console.log('搜索关键词:', searchKeyword.value)
+}
+
 function handleUpload() {
-  emit('upload')
+  showModal.value = true
 }
 
 function handleView(id: number) {
-  emit('view', id)
+  console.log('查看图片:', id)
+  // TODO: 实现图片预览功能
 }
 
 function handleCopy(url: string) {
   navigator.clipboard.writeText(url)
   alert('图片链接已复制到剪贴板')
-  emit('copy', url)
 }
 
 function handleDelete(id: number) {
   if (confirm('确定要删除这张图片吗？')) {
-    emit('delete', id)
+    const index = images.value.findIndex((img) => img.id === id)
+    if (index !== -1) {
+      images.value.splice(index, 1)
+      console.log('删除图片:', id)
+    }
   }
+}
+
+function handleModalSubmit(data: any) {
+  const newImage = {
+    id: images.value.length + 1,
+    title: data.title || '未命名图片',
+    description: data.description,
+    imageUrl: URL.createObjectURL(data.file),
+    thumbnailUrl: URL.createObjectURL(data.file),
+    category: data.category || '其他',
+    size: '未知',
+    status: data.status,
+    createdAt: new Date().toISOString().split('T')[0]
+  }
+  images.value.push(newImage)
+  console.log('上传图片:', newImage)
+  showModal.value = false
 }
 </script>
 
@@ -171,6 +365,7 @@ function handleDelete(id: number) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width: 100%;
   min-height: 0;
 }
 
@@ -178,7 +373,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
 }
@@ -195,6 +390,9 @@ function handleDelete(id: number) {
 
 .action-bar-right {
   flex-shrink: 0;
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
 }
 
 .stats-info {
@@ -252,6 +450,24 @@ function handleDelete(id: number) {
   color: var(--color-gray-400);
 }
 
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
+}
+
 .filter-select {
   min-width: 140px;
   padding: var(--spacing-sm) var(--spacing-md);
@@ -268,6 +484,40 @@ function handleDelete(id: number) {
   outline: none;
   border-color: var(--color-miku-500);
   box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1);
+}
+
+.view-toggle {
+  display: flex;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.view-btn:hover {
+  background: var(--color-gray-50);
+}
+
+.view-btn.active {
+  background: var(--color-miku-500);
+  color: var(--color-white);
+}
+
+.view-btn:not(:last-child) {
+  border-right: 1px solid var(--color-gray-200);
 }
 
 .primary-btn {
@@ -293,7 +543,7 @@ function handleDelete(id: number) {
 .gallery-grid-wrapper {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-xl) 0;
+  padding: var(--spacing-xl) 2%;
 }
 
 .gallery-grid-wrapper::-webkit-scrollbar {
@@ -409,6 +659,188 @@ function handleDelete(id: number) {
   color: var(--color-gray-600);
 }
 
+.image-category {
+  padding: 2px 8px;
+  background: var(--color-miku-50);
+  color: var(--color-miku-700);
+  border-radius: 4px;
+}
+
+/* 列表视图样式 */
+.gallery-list-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.gallery-list-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.gallery-list-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gallery-list-wrapper::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 3px;
+}
+
+.gallery-list-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+.gallery-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+}
+
+.gallery-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--color-gray-50);
+  z-index: 10;
+}
+
+.gallery-table th {
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-gray-700);
+  border-bottom: 2px solid var(--color-gray-200);
+  white-space: nowrap;
+}
+
+.gallery-table th:first-child {
+  padding-left: var(--spacing-lg);
+}
+
+.gallery-table th:last-child {
+  padding-right: var(--spacing-lg);
+}
+
+.gallery-table td {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-gray-100);
+  vertical-align: middle;
+}
+
+.gallery-table td:first-child {
+  padding-left: var(--spacing-lg);
+}
+
+.gallery-table td:last-child {
+  padding-right: var(--spacing-lg);
+}
+
+.image-row:hover {
+  background: var(--color-gray-50);
+}
+
+.col-preview {
+  width: 80px;
+}
+
+.col-name {
+  width: 35%;
+}
+
+.col-category {
+  width: 12%;
+}
+
+.col-size {
+  width: 12%;
+}
+
+.col-date {
+  width: 15%;
+}
+
+.col-actions {
+  width: 10%;
+}
+
+.preview-thumbnail {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-gray-100);
+}
+
+.preview-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.image-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-gray-900);
+}
+
+.image-description {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  background: var(--color-miku-50);
+  color: var(--color-miku-700);
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.col-size,
+.col-date {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+}
+
+.actions-cell {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.action-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.action-icon-btn:hover {
+  background: var(--color-miku-100);
+  color: var(--color-miku-600);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -427,5 +859,57 @@ function handleDelete(id: number) {
 .empty-state p {
   margin: 0 0 var(--spacing-xl) 0;
   font-size: var(--text-base);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) 2%;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.pagination-info {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.pagination-btn {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-gray-700);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--color-miku-500);
+  color: var(--color-miku-600);
+}
+
+.pagination-btn.active {
+  background: var(--color-miku-500);
+  border-color: var(--color-miku-500);
+  color: var(--color-white);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

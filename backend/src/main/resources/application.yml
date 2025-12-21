@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: personal-blog
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/personal_blog?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+  
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+  
+  # 邮件配置
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 2840672993@qq.com
+    password: ncnutdjffugjdejc
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+  
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 3000ms
+  
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.blog.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# Sa-Token 配置
+sa-token:
+  # token 名称
+  token-name: Authorization
+  # token 有效期（单位：秒）默认30天，-1代表永不过期
+  timeout: 2592000
+  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制
+  active-timeout: -1
+  # 是否允许同一账号多地同时登录（为 true 时允许一起登录，为 false 时新登录挤掉旧登录）
+  is-concurrent: true
+  # 在多人登录同一账号时，是否共用一个 token（为 true 时所有登录共用一个 token，为 false 时每次登录新建一个 token）
+  is-share: false
+  # token 风格
+  token-style: uuid
+  # 是否输出操作日志
+  is-log: false
+  # JWT 秘钥
+  jwt-secret-key: abcdefghijklmnopqrstuvwxyz1234567890
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# 文件上传配置
+upload:
+  path: uploads
+  url-prefix: /uploads
+
+logging:
+  level:
+    com.blog: debug

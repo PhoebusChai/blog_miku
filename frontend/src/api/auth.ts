@@ -1,22 +1,4 @@
-// Mock 用户数据
-const mockUsers = [
-  {
-    id: 1,
-    email: 'admin@example.com',
-    password: '123456',
-    name: '管理员',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-    role: 'admin'
-  },
-  {
-    id: 2,
-    email: 'user@example.com',
-    password: '123456',
-    name: '普通用户',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=user',
-    role: 'user'
-  }
-]
+import request from './request'
 
 export interface LoginData {
   email: string
@@ -24,69 +6,120 @@ export interface LoginData {
   remember?: boolean
 }
 
+export interface RegisterData {
+  email: string
+  password: string
+  name: string
+}
+
+export interface RegisterWithCodeData {
+  email: string
+  code: string
+  password: string
+  name: string
+}
+
 export interface UserInfo {
   id: number
   email: string
   name: string
   avatar: string
-  role?: string
+  role?: number
+  status?: number
 }
 
-// Mock 登录接口
-export const login = async (data: LoginData): Promise<{ token: string; user: UserInfo }> => {
-  // 模拟网络延迟
-  await new Promise(resolve => setTimeout(resolve, 1000))
+export interface LoginResponse {
+  token: string
+  user: UserInfo
+  message?: string
+}
 
-  const user = mockUsers.find(u => u.email === data.email && u.password === data.password)
-
-  if (!user) {
-    throw new Error('邮箱或密码错误')
-  }
-
-  // 生成 mock token
-  const token = `mock_token_${user.id}_${Date.now()}`
-
-  // 如果选择记住我，保存到 localStorage
-  if (data.remember) {
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      avatar: user.avatar,
-      role: user.role
-    }))
-  }
-
-  return {
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      avatar: user.avatar,
-      role: user.role
+/**
+ * 登录
+ */
+export const login = async (data: LoginData): Promise<LoginResponse> => {
+  const result = await request<LoginResponse>({
+    url: '/auth/login',
+    method: 'post',
+    data: {
+      email: data.email,
+      password: data.password
     }
+  })
+
+  // 保存 token 和用户信息
+  if (result.token) {
+    localStorage.setItem('token', result.token)
+    localStorage.setItem('user', JSON.stringify(result.user))
+  }
+
+  return result
+}
+
+/**
+ * 注册（不需要验证码）
+ */
+export const register = async (data: RegisterData): Promise<void> => {
+  await request({
+    url: '/auth/register',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 使用验证码注册
+ */
+export const registerWithCode = async (data: RegisterWithCodeData): Promise<void> => {
+  await request({
+    url: '/auth/register-with-code',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 登出
+ */
+export const logout = async (): Promise<void> => {
+  try {
+    await request({
+      url: '/auth/logout',
+      method: 'post'
+    })
+  } finally {
+    // 无论请求是否成功，都清除本地数据
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
   }
 }
 
-// Mock 登出接口
-export const logout = async (): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, 500))
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-}
-
-// Mock 获取当前用户信息
+/**
+ * 获取当前用户信息
+ */
 export const getCurrentUser = async (): Promise<UserInfo | null> => {
-  await new Promise(resolve => setTimeout(resolve, 300))
-  
   const token = localStorage.getItem('token')
   const userStr = localStorage.getItem('user')
-  
+
   if (!token || !userStr) {
     return null
   }
 
-  return JSON.parse(userStr)
+  try {
+    // 验证 token 是否有效
+    const user = await request<UserInfo>({
+      url: '/auth/current',
+      method: 'get'
+    })
+    
+    // 更新本地存储的用户信息
+    localStorage.setItem('user', JSON.stringify(user))
+    
+    return user
+  } catch (error) {
+    // token 无效，清除本地数据
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    return null
+  }
 }

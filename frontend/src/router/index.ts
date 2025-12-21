@@ -51,7 +51,60 @@ const router = createRouter({
     {
       path: '/admin',
       name: 'admin',
-      component: () => import('@/views/Admin.vue')
+      component: () => import('@/views/Admin.vue'),
+      redirect: '/admin/dashboard',
+      children: [
+        {
+          path: 'dashboard',
+          name: 'admin-dashboard',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'articles',
+          name: 'admin-articles',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'tags',
+          name: 'admin-tags',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'comments',
+          name: 'admin-comments',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'projects',
+          name: 'admin-projects',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'gallery',
+          name: 'admin-gallery',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'links',
+          name: 'admin-links',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'settings',
+          name: 'admin-settings',
+          component: () => import('@/views/Admin.vue')
+        },
+        {
+          path: 'tools',
+          name: 'admin-tools',
+          component: () => import('@/views/Admin.vue')
+        }
+      ]
     },
     {
       path: '/error',

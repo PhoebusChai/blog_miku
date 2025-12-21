@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.blog.mapper.CommentMapper">
+    
+    <!-- 获取所有评论（管理员） -->
+    <select id="getAdminComments" resultType="java.util.HashMap">
+        SELECT 
+            c.id,
+            c.article_id as articleId,
+            c.user_id as userId,
+            c.parent_id as parentId,
+            c.guest_name as guestName,
+            c.guest_email as guestEmail,
+            c.content,
+            c.ip_address as ipAddress,
+            c.like_count as likeCount,
+            c.status,
+            DATE_FORMAT(c.created_at, '%Y-%m-%d %H:%i:%s') as createdAt,
+            DATE_FORMAT(c.updated_at, '%Y-%m-%d %H:%i:%s') as updatedAt,
+            u.name as userName,
+            u.avatar as userAvatar,
+            a.title as articleTitle
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        LEFT JOIN articles a ON c.article_id = a.id
+        <where>
+            <if test="status != null">
+                AND c.status = #{status}
+            </if>
+            <if test="articleId != null">
+                AND c.article_id = #{articleId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    c.content LIKE CONCAT('%', #{keyword}, '%')
+                    OR c.guest_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR c.guest_email LIKE CONCAT('%', #{keyword}, '%')
+                    OR u.name LIKE CONCAT('%', #{keyword}, '%')
+                    OR u.email LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY c.created_at DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+    
+    <!-- 统计评论数量（管理员） -->
+    <select id="countAdminComments" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        <where>
+            <if test="status != null">
+                AND c.status = #{status}
+            </if>
+            <if test="articleId != null">
+                AND c.article_id = #{articleId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    c.content LIKE CONCAT('%', #{keyword}, '%')
+                    OR c.guest_name LIKE CONCAT('%', #{keyword}, '%')
+                    OR c.guest_email LIKE CONCAT('%', #{keyword}, '%')
+                    OR u.name LIKE CONCAT('%', #{keyword}, '%')
+                    OR u.email LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+    </select>
+    
+</mapper>

@@ -9,21 +9,21 @@
             :class="{ active: activeTab === 'all' }"
             @click="activeTab = 'all'"
           >
-            全部 ({{ stats.total }})
+            全部 ({{ localStats.total }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'published' }"
             @click="activeTab = 'published'"
           >
-            已发布 ({{ stats.published }})
+            已发布 ({{ localStats.published }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'draft' }"
             @click="activeTab = 'draft'"
           >
-            草稿 ({{ stats.draft }})
+            草稿 ({{ localStats.draft }})
           </button>
           <button
             class="tab-btn"
@@ -42,13 +42,22 @@
             type="text"
             placeholder="搜索文章标题或内容..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
-        <select v-model="tagFilter" class="filter-select">
-          <option value="">全部标签</option>
-          <option value="vue">Vue.js</option>
-          <option value="typescript">TypeScript</option>
-          <option value="javascript">JavaScript</option>
+        <select 
+          v-model="tagFilter" 
+          class="filter-select" 
+          @change="handleTagFilterChange"
+          :disabled="availableTags.length === 0"
+        >
+          <option value="">
+            {{ availableTags.length === 0 ? '暂无标签' : '全部标签' }}
+          </option>
+          <option v-for="tag in availableTags" :key="tag.id" :value="tag.slug">
+            {{ tag.name }} ({{ tag.articleCount }})
+          </option>
         </select>
       </div>
       <div class="action-bar-right">
@@ -61,7 +70,13 @@
 
     <!-- 文章列表 -->
     <div class="article-list-wrapper">
-      <table class="article-table">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>加载中...</p>
+      </div>
+
+      <table v-else class="article-table">
         <thead>
           <tr>
             <th class="col-title">标题</th>
@@ -87,8 +102,8 @@
             </td>
             <td class="col-tags">
               <div class="tags-cell">
-                <span v-for="tag in article.tags" :key="tag" class="tag-badge">
-                  {{ tag }}
+                <span v-for="tag in article.tags" :key="tag.id" class="tag-badge">
+                  {{ tag.name }}
                 </span>
               </div>
             </td>
@@ -96,15 +111,15 @@
               <div class="stats-cell">
                 <span class="stat-item">
                   <Eye :size="14" />
-                  {{ article.viewCount }}
+                  {{ article.viewCount || 0 }}
                 </span>
                 <span class="stat-item">
                   <MessageSquare :size="14" />
-                  {{ article.commentCount }}
+                  {{ article.commentCount || 0 }}
                 </span>
               </div>
             </td>
-            <td class="col-date">{{ article.createdAt }}</td>
+            <td class="col-date">{{ formatDate(article.createdAt) }}</td>
             <td class="col-actions">
               <div class="actions-cell">
                 <button class="action-icon-btn" @click="handleEdit(article.id)">
@@ -130,7 +145,7 @@
       </table>
 
       <!-- 空状态 -->
-      <div v-if="filteredArticles.length === 0" class="empty-state">
+      <div v-if="!loading && filteredArticles.length === 0" class="empty-state">
         <FileText :size="48" class="empty-icon" />
         <p>暂无文章</p>
         <button class="primary-btn" @click="handleCreate">
@@ -169,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   Search,
   Plus,
@@ -182,6 +197,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-vue-next'
+import { getMyArticles, deleteArticle, getAllTags, type Article } from '@/api/article'
 
 // Props
 interface Props {
@@ -201,6 +217,7 @@ const emit = defineEmits<{
   view: [id: number]
   delete: [id: number]
   restore: [id: number]
+  statsUpdate: [stats: { total: number; published: number; draft: number }]
 }>()
 
 // 状态
@@ -209,30 +226,61 @@ const searchKeyword = ref('')
 const tagFilter = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const loading = ref(false)
 
-// Mock 数据
-const articles = ref([
-  {
-    id: 1,
-    title: '欢迎来到我的博客',
-    summary: '这是我的第一篇博客文章，记录我的技术成长之路。',
-    status: 1,
-    viewCount: 128,
-    commentCount: 5,
-    tags: ['前端开发'],
-    createdAt: '2024-12-19'
-  },
-  {
-    id: 2,
-    title: 'Vue 3 Composition API 实践',
-    summary: '深入探讨 Vue 3 Composition API 的使用技巧和最佳实践。',
-    status: 1,
-    viewCount: 256,
-    commentCount: 12,
-    tags: ['Vue.js', 'TypeScript', '前端开发'],
-    createdAt: '2024-12-19'
+// 文章数据
+const articles = ref<Article[]>([])
+
+// 标签列表
+const availableTags = ref<Array<{ id: number; name: string; slug: string; articleCount: number }>>([])
+
+// 统计数据（基于实际加载的文章）
+const localStats = computed(() => {
+  const total = articles.value.length
+  const published = articles.value.filter(a => a.status === 1).length
+  const draft = articles.value.filter(a => a.status === 0).length
+  return { total, published, draft }
+})
+
+// 加载标签列表
+async function loadTags() {
+  try {
+    const tags = await getAllTags()
+    availableTags.value = tags || []
+  } catch (error) {
+    console.error('加载标签失败:', error)
   }
-])
+}
+
+// 加载文章列表
+async function loadArticles() {
+  try {
+    loading.value = true
+    const result = await getMyArticles({
+      page: currentPage.value,
+      pageSize: pageSize.value
+    })
+    articles.value = result.records || []
+    
+    // 更新统计数据
+    emit('statsUpdate', localStats.value)
+  } catch (error) {
+    console.error('加载文章失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 初始化
+onMounted(() => {
+  loadArticles()
+  loadTags()
+})
+
+// 监听 activeTab 变化，重置到第一页
+watch(activeTab, () => {
+  currentPage.value = 1
+})
 
 // 筛选文章
 const filteredArticles = computed(() => {
@@ -250,13 +298,17 @@ const filteredArticles = computed(() => {
     const keyword = searchKeyword.value.toLowerCase()
     result = result.filter(
       (a) =>
-        a.title.toLowerCase().includes(keyword) || a.summary.toLowerCase().includes(keyword)
+        a.title.toLowerCase().includes(keyword) || 
+        (a.summary && a.summary.toLowerCase().includes(keyword))
     )
   }
 
   if (tagFilter.value) {
     result = result.filter((a) =>
-      a.tags.some((tag) => tag.toLowerCase().includes(tagFilter.value.toLowerCase()))
+      a.tags?.some((tag) => 
+        tag.slug === tagFilter.value || 
+        tag.name.toLowerCase().includes(tagFilter.value.toLowerCase())
+      )
     )
   }
 
@@ -331,14 +383,43 @@ function handleView(id: number) {
   emit('view', id)
 }
 
-function handleDelete(id: number) {
+async function handleDelete(id: number) {
   if (confirm('确定要删除这篇文章吗？')) {
-    emit('delete', id)
+    try {
+      await deleteArticle(id)
+      // 重新加载文章列表
+      await loadArticles()
+      emit('delete', id)
+    } catch (error) {
+      console.error('删除文章失败:', error)
+      alert('删除失败，请重试')
+    }
   }
 }
 
 function handleRestore(id: number) {
   emit('restore', id)
+}
+
+function handleSearch() {
+  // 搜索逻辑已通过 computed 自动处理
+  console.log('搜索关键词:', searchKeyword.value)
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleTagFilterChange() {
+  currentPage.value = 1 // 重置到第一页
+}
+
+// 格式化日期
+function formatDate(dateString?: string): string {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
 }
 </script>
 
@@ -460,6 +541,24 @@ function handleRestore(id: number) {
   color: var(--color-gray-400);
 }
 
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
+}
+
 .filter-select {
   min-width: 140px;
   padding: var(--spacing-sm) var(--spacing-md);
@@ -476,6 +575,12 @@ function handleRestore(id: number) {
   outline: none;
   border-color: var(--color-miku-500);
   box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1);
+}
+
+.filter-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-gray-100);
 }
 
 .article-list-wrapper {
@@ -706,6 +811,37 @@ function handleRestore(id: number) {
 
 .empty-state p {
   margin: 0 0 var(--spacing-xl) 0;
+  font-size: var(--text-base);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl);
+  text-align: center;
+  color: var(--color-gray-500);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: var(--spacing-lg);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state p {
+  margin: 0;
   font-size: var(--text-base);
 }
 

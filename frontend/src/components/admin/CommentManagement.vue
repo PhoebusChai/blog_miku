@@ -42,7 +42,9 @@
             type="text"
             placeholder="搜索评论内容或用户..."
             class="search-input"
+            @keyup.enter="handleSearch"
           />
+          <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
         <select v-model="articleFilter" class="filter-select">
           <option value="">全部文章</option>
@@ -355,6 +357,11 @@ function handleDelete(id: number) {
     emit('delete', id)
   }
 }
+
+function handleSearch() {
+  // 搜索逻辑已通过 computed 自动处理
+  console.log('搜索关键词:', searchKeyword.value)
+}
 </script>
 
 <style scoped>
@@ -362,6 +369,7 @@ function handleDelete(id: number) {
   display: flex;
   flex-direction: column;
   flex: 1;
+  width:100%;
   min-height: 0;
 }
 
@@ -369,7 +377,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-gray-200);
   margin: 0;
@@ -448,6 +456,24 @@ function handleDelete(id: number) {
 
 .search-input::placeholder {
   color: var(--color-gray-400);
+}
+
+.search-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-white);
+  background: var(--color-miku-500);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-btn:hover {
+  background: var(--color-miku-600);
 }
 
 .filter-select {
@@ -726,7 +752,7 @@ function handleDelete(id: number) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 2%;
   background: var(--color-white);
   border-top: 1px solid var(--color-gray-200);
   margin: 0;

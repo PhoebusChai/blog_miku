@@ -2,8 +2,8 @@
   <article class="featured-article" @click="goToArticle">
     <div class="featured-article__image">
       <img 
-        v-if="article.cover" 
-        :src="article.cover" 
+        v-if="article.coverImage" 
+        :src="article.coverImage" 
         :alt="article.title"
         class="article-image"
       />
@@ -14,15 +14,15 @@
       <h3 class="featured-article__title">{{ article.title }}</h3>
       <p class="featured-article__summary">{{ article.summary }}</p>
       <div class="featured-article__meta">
-        <span class="featured-article__date">{{ formatDate(article.createdAt) }}</span>
+        <span class="featured-article__date">{{ formatDate(article.publishedAt || article.createdAt) }}</span>
         <div class="featured-article__stats">
           <span class="stat-item">
             <Eye :size="14" />
-            {{ article.views }}
+            {{ article.viewCount || 0 }}
           </span>
           <span class="stat-item">
             <Heart :size="14" />
-            {{ article.likes }}
+            {{ article.likeCount || 0 }}
           </span>
         </div>
       </div>
@@ -46,7 +46,8 @@ function goToArticle() {
   router.push(`/article/${props.article.id}`)
 }
 
-function formatDate(date: Date) {
+function formatDate(date?: string) {
+  if (!date) return ''
   return new Date(date).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'long',

@@ -95,6 +95,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { X, LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, Loader } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
+import { message } from '@/utils/message'
 
 const router = useRouter()
 
@@ -152,13 +153,15 @@ async function handleLogin() {
 
   try {
     const { loginUser } = useUserStore()
-    await loginUser(formData.value)
+    const result = await loginUser(formData.value)
 
-    // 登录成功
+    // 登录成功 - 使用后端返回的消息
+    message.success(result.message || '登录成功！')
     emit('success')
     closeModal()
   } catch (err: any) {
     error.value = err.message || '登录失败，请检查邮箱和密码'
+    message.error(error.value)
   } finally {
     loading.value = false
   }
