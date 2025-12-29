@@ -4,39 +4,21 @@
     <div class="action-bar">
       <div class="action-bar-left">
         <div class="tab-group">
-          <button
-            class="tab-btn"
-            :class="{ active: activeTab === 'all' }"
-            @click="activeTab = 'all'"
-          >
-            全部 ({{ links.length }})
+          <button class="tab-btn" :class="{ active: activeTab === 'all' }" @click="switchTab('all')">
+            全部 ({{ stats.total }})
           </button>
-          <button
-            class="tab-btn"
-            :class="{ active: activeTab === 'approved' }"
-            @click="activeTab = 'approved'"
-          >
-            已通过
+          <button class="tab-btn" :class="{ active: activeTab === 'approved' }" @click="switchTab('approved')">
+            已通过 ({{ stats.approved }})
           </button>
-          <button
-            class="tab-btn"
-            :class="{ active: activeTab === 'pending' }"
-            @click="activeTab = 'pending'"
-          >
-            待审核
+          <button class="tab-btn" :class="{ active: activeTab === 'pending' }" @click="switchTab('pending')">
+            待审核 ({{ stats.pending }})
           </button>
         </div>
       </div>
       <div class="action-bar-center">
         <div class="search-box">
           <Search :size="18" />
-          <input
-            v-model="searchKeyword"
-            type="text"
-            placeholder="搜索网站名称或链接..."
-            class="search-input"
-            @keyup.enter="handleSearch"
-          />
+          <input v-model="searchKeyword" type="text" placeholder="搜索网站名称或链接..." class="search-input" @keyup.enter="handleSearch" />
           <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
       </div>
@@ -48,8 +30,14 @@
       </div>
     </div>
 
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <Loader2 :size="32" class="loading-icon" />
+      <p>加载中...</p>
+    </div>
+
     <!-- 友链列表 -->
-    <div class="link-list-wrapper">
+    <div v-else class="link-list-wrapper">
       <table class="link-table">
         <thead>
           <tr>
@@ -61,7 +49,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="link in paginatedLinks" :key="link.id" class="link-row">
+          <tr v-for="link in filteredLinks" :key="link.id" class="link-row">
             <td class="col-site">
               <div class="site-cell">
                 <div class="site-avatar">
@@ -85,21 +73,19 @@
                 {{ getStatusText(link.status) }}
               </span>
             </td>
-            <td class="col-date">{{ link.createdAt }}</td>
+            <td class="col-date">{{ formatDate(link.createdAt) }}</td>
             <td class="col-actions">
               <div class="actions-cell">
-                <button
-                  v-if="link.status === 0"
-                  class="action-icon-btn"
-                  title="通过"
-                  @click="handleApprove(link.id)"
-                >
+                <button v-if="link.status === 0" type="button" class="action-icon-btn action-icon-btn--approve" title="通过" @click.stop="handleApprove(link.id)">
                   <Check :size="16" />
                 </button>
-                <button class="action-icon-btn" title="编辑" @click="handleEdit(link.id)">
+                <button v-if="link.status === 0" type="button" class="action-icon-btn action-icon-btn--reject" title="拒绝" @click.stop="handleReject(link.id)">
+                  <X :size="16" />
+                </button>
+                <button type="button" class="action-icon-btn" title="编辑" @click.stop="handleEdit(link)">
                   <Edit :size="16" />
                 </button>
-                <button class="action-icon-btn" title="删除" @click="handleDelete(link.id)">
+                <button type="button" class="action-icon-btn action-icon-btn--delete" title="删除" @click.stop="handleDelete(link.id)">
                   <Trash2 :size="16" />
                 </button>
               </div>
@@ -108,7 +94,6 @@
         </tbody>
       </table>
 
-      <!-- 空状态 -->
       <div v-if="filteredLinks.length === 0" class="empty-state">
         <Link :size="48" class="empty-icon" />
         <p>暂无友链</p>
@@ -119,237 +104,146 @@
       </div>
     </div>
 
-    <!-- 分页 -->
-    <div v-if="filteredLinks.length > 0" class="pagination">
-      <div class="pagination-info">共 {{ filteredLinks.length }} 条，每页 {{ pageSize }} 条</div>
-      <div class="pagination-controls">
-        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
-          <ChevronLeft :size="16" />
-        </button>
-        <button
-          v-for="page in displayPages"
-          :key="page"
-          class="pagination-btn"
-          :class="{ active: page === currentPage }"
-          :disabled="typeof page === 'string'"
-          @click="typeof page === 'number' && (currentPage = page)"
-        >
-          {{ page }}
-        </button>
-        <button
-          class="pagination-btn"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          <ChevronRight :size="16" />
-        </button>
-      </div>
-    </div>
-
-    <!-- 友链表单弹窗 -->
-    <LinkFormModal
-      :visible="showModal"
-      :is-edit="isEditMode"
-      :initial-data="editingLink"
-      @close="showModal = false"
-      @submit="handleModalSubmit"
-    />
+    <LinkFormModal :visible="showModal" :is-edit="isEditMode" :initial-data="editingLink" @close="showModal = false" @submit="handleModalSubmit" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Link,
-  Globe,
-  ExternalLink,
-  Check,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Search, Plus, Edit, Trash2, Link, Globe, ExternalLink, Check, X, Loader2 } from 'lucide-vue-next'
 import LinkFormModal from './LinkFormModal.vue'
+import { getAdminLinks, getLinkStats, createLink, updateLink, approveLink, rejectLink, deleteLink } from '@/api/link'
+import { message } from '@/utils/message'
+import { ElMessageBox } from 'element-plus'
 
-// 状态
+const loading = ref(false)
 const activeTab = ref('all')
 const searchKeyword = ref('')
-const currentPage = ref(1)
-const pageSize = ref(10)
 const showModal = ref(false)
 const isEditMode = ref(false)
 const editingLink = ref<any>(null)
+const editingId = ref<number | null>(null)
 
-// Mock 数据
-const links = ref([
-  {
-    id: 1,
-    name: '技术博客',
-    url: 'https://example.com',
-    description: '专注前端技术分享',
-    avatar: 'https://via.placeholder.com/48',
-    status: 1, // 0-待审核，1-已通过，2-已拒绝
-    createdAt: '2024-12-15'
-  },
-  {
-    id: 2,
-    name: '开发者社区',
-    url: 'https://dev.example.com',
-    description: '开发者交流平台',
-    avatar: '',
-    status: 0,
-    createdAt: '2024-12-18'
+const links = ref<any[]>([])
+const stats = ref({ total: 0, pending: 0, approved: 0, rejected: 0 })
+
+async function loadLinks() {
+  loading.value = true
+  try {
+    const status = activeTab.value === 'approved' ? 1 : activeTab.value === 'pending' ? 0 : undefined
+    links.value = await getAdminLinks(status)
+  } catch (error: any) {
+    message.error(error.message || '加载友链失败')
+  } finally {
+    loading.value = false
   }
-])
+}
 
-// 筛选友链
+async function loadStats() {
+  try {
+    stats.value = await getLinkStats()
+  } catch (error: any) {
+    console.error('加载统计失败:', error)
+  }
+}
+
+function switchTab(tab: string) {
+  activeTab.value = tab
+  loadLinks()
+}
+
 const filteredLinks = computed(() => {
-  let result = links.value
-
-  if (activeTab.value === 'approved') {
-    result = result.filter((l) => l.status === 1)
-  } else if (activeTab.value === 'pending') {
-    result = result.filter((l) => l.status === 0)
-  }
-
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(
-      (l) =>
-        l.name.toLowerCase().includes(keyword) ||
-        l.url.toLowerCase().includes(keyword) ||
-        l.description.toLowerCase().includes(keyword)
-    )
-  }
-
-  return result
+  if (!searchKeyword.value) return links.value
+  const keyword = searchKeyword.value.toLowerCase()
+  return links.value.filter((l) => l.name?.toLowerCase().includes(keyword) || l.url?.toLowerCase().includes(keyword))
 })
 
-// 分页
-const totalPages = computed(() => Math.ceil(filteredLinks.value.length / pageSize.value))
-
-const paginatedLinks = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredLinks.value.slice(start, end)
-})
-
-const displayPages = computed(() => {
-  const pages: (number | string)[] = []
-  const total = totalPages.value
-  const current = currentPage.value
-
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    if (current <= 4) {
-      for (let i = 1; i <= 5; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(total)
-    } else if (current >= total - 3) {
-      pages.push(1)
-      pages.push('...')
-      for (let i = total - 4; i <= total; i++) {
-        pages.push(i)
-      }
-    } else {
-      pages.push(1)
-      pages.push('...')
-      for (let i = current - 1; i <= current + 1; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(total)
-    }
-  }
-
-  return pages
-})
-
-// 方法
 function getStatusText(status: number): string {
-  const statusMap: Record<number, string> = {
-    0: '待审核',
-    1: '已通过',
-    2: '已拒绝'
-  }
+  const statusMap: Record<number, string> = { 0: '待审核', 1: '已通过', 2: '已拒绝' }
   return statusMap[status] || '未知'
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
 function handleCreate() {
   isEditMode.value = false
   editingLink.value = null
+  editingId.value = null
   showModal.value = true
 }
 
-function handleEdit(id: number) {
-  const link = links.value.find((l) => l.id === id)
-  if (link) {
-    isEditMode.value = true
-    editingLink.value = {
-      name: link.name,
-      url: link.url,
-      avatar: link.avatar,
-      description: link.description,
-      status: link.status
+function handleEdit(link: any) {
+  isEditMode.value = true
+  editingId.value = link.id
+  editingLink.value = { name: link.name, url: link.url, avatar: link.avatar, description: link.description, status: link.status }
+  showModal.value = true
+}
+
+async function handleApprove(id: number) {
+  try {
+    await approveLink(id)
+    message.success('友链已通过')
+    loadLinks()
+    loadStats()
+  } catch (error: any) {
+    message.error(error.message || '操作失败')
+  }
+}
+
+async function handleReject(id: number) {
+  try {
+    await ElMessageBox.confirm('确定要拒绝这个友链申请吗？', '拒绝确认', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+    await rejectLink(id)
+    message.success('友链已拒绝')
+    loadLinks()
+    loadStats()
+  } catch (error: any) {
+    if (error !== 'cancel') message.error(error.message || '操作失败')
+  }
+}
+
+async function handleDelete(id: number) {
+  try {
+    await ElMessageBox.confirm('确定要删除这个友链吗？', '删除确认', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+    await deleteLink(id)
+    message.success('友链已删除')
+    loadLinks()
+    loadStats()
+  } catch (error: any) {
+    if (error !== 'cancel') message.error(error.message || '删除失败')
+  }
+}
+
+function handleSearch() {}
+
+async function handleModalSubmit(data: any) {
+  try {
+    if (isEditMode.value && editingId.value) {
+      await updateLink(editingId.value, data)
+      message.success('友链已更新')
+    } else {
+      await createLink(data)
+      message.success('友链已创建')
     }
-    showModal.value = true
+    showModal.value = false
+    loadLinks()
+    loadStats()
+  } catch (error: any) {
+    message.error(error.message || '操作失败')
   }
 }
 
-function handleApprove(id: number) {
-  const link = links.value.find((l) => l.id === id)
-  if (link) {
-    link.status = 1
-    console.log('通过友链:', id)
-  }
-}
-
-function handleDelete(id: number) {
-  if (confirm('确定要删除这个友链吗？')) {
-    const index = links.value.findIndex((l) => l.id === id)
-    if (index !== -1) {
-      links.value.splice(index, 1)
-      console.log('删除友链:', id)
-    }
-  }
-}
-
-function handleSearch() {
-  console.log('搜索关键词:', searchKeyword.value)
-}
-
-function handleModalSubmit(data: any) {
-  if (isEditMode.value) {
-    console.log('更新友链:', data)
-    // TODO: 调用API更新友链
-  } else {
-    const newLink = {
-      id: links.value.length + 1,
-      ...data,
-      createdAt: new Date().toISOString().split('T')[0]
-    }
-    links.value.push(newLink)
-    console.log('创建友链:', newLink)
-  }
-  showModal.value = false
-}
+onMounted(() => {
+  loadLinks()
+  loadStats()
+})
 </script>
 
 <style scoped>
-.link-management {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width:100%;
-  min-height: 0;
-}
+.link-management { display: flex; flex-direction: column; flex: 1; width: 100%; min-height: 0; }
 
 .action-bar {
   display: flex;
@@ -360,24 +254,10 @@ function handleModalSubmit(data: any) {
   border-bottom: 1px solid var(--color-gray-200);
 }
 
-.action-bar-left,
-.action-bar-right {
-  flex-shrink: 0;
-}
+.action-bar-left, .action-bar-right { flex-shrink: 0; }
+.action-bar-center { flex: 1; display: flex; gap: var(--spacing-md); }
 
-.action-bar-center {
-  flex: 1;
-  display: flex;
-  gap: var(--spacing-md);
-}
-
-.tab-group {
-  display: inline-flex;
-  background: var(--color-white);
-  border-radius: 8px;
-  padding: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
+.tab-group { display: inline-flex; background: var(--color-white); border-radius: 8px; padding: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
 
 .tab-btn {
   padding: var(--spacing-sm) var(--spacing-lg);
@@ -388,18 +268,11 @@ function handleModalSubmit(data: any) {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
-.tab-btn:hover {
-  color: var(--color-gray-900);
-}
-
-.tab-btn.active {
-  background: var(--color-miku-500);
-  color: var(--color-white);
-}
+.tab-btn:hover { color: var(--color-gray-900); }
+.tab-btn.active { background: var(--color-miku-500); color: var(--color-white); }
 
 .search-box {
   flex: 1;
@@ -410,49 +283,14 @@ function handleModalSubmit(data: any) {
   background: var(--color-gray-50);
   border: 1px solid var(--color-gray-200);
   border-radius: 6px;
-  transition: all var(--transition-fast);
 }
 
-.search-box:focus-within {
-  border-color: var(--color-miku-500);
-  box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1);
-}
-
-.search-box svg {
-  color: var(--color-gray-400);
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: var(--text-sm);
-  color: var(--color-gray-900);
-  background: transparent;
-}
-
-.search-input::placeholder {
-  color: var(--color-gray-400);
-}
-
-.search-btn {
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-white);
-  background: var(--color-miku-500);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.search-btn:hover {
-  background: var(--color-miku-600);
-}
+.search-box:focus-within { border-color: var(--color-miku-500); box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1); }
+.search-box svg { color: var(--color-gray-400); flex-shrink: 0; }
+.search-input { flex: 1; border: none; outline: none; font-size: var(--text-sm); color: var(--color-gray-900); background: transparent; }
+.search-input::placeholder { color: var(--color-gray-400); }
+.search-btn { padding: var(--spacing-xs) var(--spacing-md); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--color-white); background: var(--color-miku-500); border: none; border-radius: 4px; cursor: pointer; }
+.search-btn:hover { background: var(--color-miku-600); }
 
 .primary-btn {
   display: inline-flex;
@@ -466,297 +304,52 @@ function handleModalSubmit(data: any) {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
-.primary-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(57, 197, 187, 0.3);
-}
+.primary-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(57, 197, 187, 0.3); }
 
-.link-list-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
-}
+.loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--spacing-3xl); color: var(--color-gray-500); }
+.loading-icon { animation: spin 1s linear infinite; margin-bottom: var(--spacing-md); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-.link-list-wrapper::-webkit-scrollbar {
-  width: 6px;
-}
+.link-list-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.link-table { width: 100%; border-collapse: collapse; background: var(--color-white); }
+.link-table thead { position: sticky; top: 0; background: var(--color-gray-50); z-index: 10; }
+.link-table th { padding: var(--spacing-md) var(--spacing-lg); text-align: left; font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--color-gray-700); border-bottom: 2px solid var(--color-gray-200); }
+.link-table td { padding: var(--spacing-lg); border-bottom: 1px solid var(--color-gray-100); vertical-align: middle; }
+.link-row:hover { background: var(--color-gray-50); }
 
-.link-list-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
+.col-site { width: 30%; }
+.col-url { width: 30%; }
+.col-status { width: 10%; }
+.col-date { width: 15%; }
+.col-actions { width: 15%; }
 
-.link-list-wrapper::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
-  border-radius: 3px;
-}
+.site-cell { display: flex; align-items: center; gap: var(--spacing-md); }
+.site-avatar { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--color-gray-100); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.site-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.site-avatar svg { color: var(--color-gray-400); }
+.site-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.site-name { font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--color-gray-900); }
+.site-description { font-size: var(--text-sm); color: var(--color-gray-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.link-list-wrapper::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray-400);
-}
+.link-url { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--color-miku-600); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-url:hover { color: var(--color-miku-700); text-decoration: underline; }
 
-.link-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-white);
-}
+.status-badge { display: inline-block; padding: 4px 12px; font-size: var(--text-xs); font-weight: var(--font-medium); border-radius: 12px; }
+.status-badge.status-0 { background: #fef3c7; color: #92400e; }
+.status-badge.status-1 { background: #d1fae5; color: #065f46; }
+.status-badge.status-2 { background: #fee2e2; color: #991b1b; }
 
-.link-table thead {
-  position: sticky;
-  top: 0;
-  background: var(--color-gray-50);
-  z-index: 10;
-}
+.actions-cell { display: flex; gap: var(--spacing-xs); }
+.action-icon-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 6px; color: var(--color-gray-600); cursor: pointer; }
+.action-icon-btn:hover { background: var(--color-miku-100); color: var(--color-miku-600); }
+.action-icon-btn--approve:hover { background: var(--color-green-100); color: var(--color-green-600); }
+.action-icon-btn--reject:hover { background: var(--color-orange-100); color: var(--color-orange-600); }
+.action-icon-btn--delete:hover { background: var(--color-red-100); color: var(--color-red-600); }
+.action-icon-btn svg { pointer-events: none; }
 
-.link-table th {
-  padding: var(--spacing-md) var(--spacing-lg);
-  text-align: left;
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  color: var(--color-gray-700);
-  border-bottom: 2px solid var(--color-gray-200);
-  white-space: nowrap;
-}
-
-.link-table th:first-child {
-  padding-left: var(--spacing-lg);
-}
-
-.link-table th:last-child {
-  padding-right: var(--spacing-lg);
-}
-
-.link-table td {
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-gray-100);
-  vertical-align: middle;
-}
-
-.link-table td:first-child {
-  padding-left: var(--spacing-lg);
-}
-
-.link-table td:last-child {
-  padding-right: var(--spacing-lg);
-}
-
-.link-row:hover {
-  background: var(--color-gray-50);
-}
-
-.col-site {
-  width: 35%;
-}
-
-.col-url {
-  width: 30%;
-}
-
-.col-status {
-  width: 10%;
-}
-
-.col-date {
-  width: 15%;
-}
-
-.col-actions {
-  width: 10%;
-}
-
-.site-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
-
-.site-avatar {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-gray-100);
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.site-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.site-avatar svg {
-  color: var(--color-gray-400);
-}
-
-.site-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.site-name {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  color: var(--color-gray-900);
-}
-
-.site-description {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.link-url {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--text-sm);
-  color: var(--color-miku-600);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.link-url:hover {
-  color: var(--color-miku-700);
-  text-decoration: underline;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  border-radius: 12px;
-  white-space: nowrap;
-}
-
-.status-badge.status-0 {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-badge.status-1 {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.status-2 {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.col-date {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-}
-
-.actions-cell {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.action-icon-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-gray-600);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.action-icon-btn:hover {
-  background: var(--color-miku-100);
-  color: var(--color-miku-600);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-3xl);
-  text-align: center;
-  color: var(--color-gray-500);
-}
-
-.empty-icon {
-  margin-bottom: var(--spacing-lg);
-  opacity: 0.5;
-}
-
-.empty-state p {
-  margin: 0 0 var(--spacing-xl) 0;
-  font-size: var(--text-base);
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg) 2%;
-  background: var(--color-white);
-  border-top: 1px solid var(--color-gray-200);
-}
-
-.pagination-info {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-}
-
-.pagination-controls {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.pagination-btn {
-  min-width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--spacing-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-gray-700);
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.pagination-btn:hover:not(:disabled):not(.active) {
-  border-color: var(--color-miku-500);
-  color: var(--color-miku-600);
-}
-
-.pagination-btn.active {
-  background: var(--color-miku-500);
-  border-color: var(--color-miku-500);
-  color: var(--color-white);
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--spacing-3xl); text-align: center; color: var(--color-gray-500); }
+.empty-icon { margin-bottom: var(--spacing-lg); opacity: 0.5; }
+.empty-state p { margin: 0 0 var(--spacing-xl) 0; font-size: var(--text-base); }
 </style>

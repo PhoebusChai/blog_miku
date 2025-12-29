@@ -29,7 +29,14 @@
                 AND c.status = #{status}
             </if>
             <if test="articleId != null">
-                AND c.article_id = #{articleId}
+                <choose>
+                    <when test="articleId == 0">
+                        AND c.article_id IS NULL
+                    </when>
+                    <otherwise>
+                        AND c.article_id = #{articleId}
+                    </otherwise>
+                </choose>
             </if>
             <if test="keyword != null and keyword != ''">
                 AND (
@@ -55,7 +62,14 @@
                 AND c.status = #{status}
             </if>
             <if test="articleId != null">
-                AND c.article_id = #{articleId}
+                <choose>
+                    <when test="articleId == 0">
+                        AND c.article_id IS NULL
+                    </when>
+                    <otherwise>
+                        AND c.article_id = #{articleId}
+                    </otherwise>
+                </choose>
             </if>
             <if test="keyword != null and keyword != ''">
                 AND (

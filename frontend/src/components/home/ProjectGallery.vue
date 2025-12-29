@@ -1,7 +1,13 @@
 <template>
   <div class="project-gallery-wrapper">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="project-loading">
+      <div class="loading-spinner"></div>
+      <span>加载中...</span>
+    </div>
+
     <!-- 空状态 -->
-    <div v-if="projects.length === 0" class="project-empty">
+    <div v-else-if="projects.length === 0" class="project-empty">
       <div class="project-empty-icon">
         <FolderOpen :size="48" />
       </div>
@@ -11,48 +17,102 @@
 
     <!-- 项目列表 -->
     <div v-else class="project-gallery">
-      <div class="project-card" v-for="project in projects" :key="project.id">
+      <a 
+        class="project-card" 
+        v-for="project in projects" 
+        :key="project.id"
+        :href="project.demoUrl || project.githubUrl || '#'"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         <div class="project-icon">
-          <component :is="project.icon" :size="32" />
+          <img v-if="project.coverImage" :src="project.coverImage" :alt="project.title" class="project-cover" />
+          <Code v-else :size="32" />
         </div>
         <div class="project-content">
           <h4 class="project-title">{{ project.title }}</h4>
-          <p class="project-desc">{{ project.description }}</p>
-          <div class="project-tags">
-            <span v-for="tag in project.tags" :key="tag" class="project-tag">{{ tag }}</span>
+          <p class="project-desc">{{ project.description || '暂无描述' }}</p>
+          <div class="project-tags" v-if="project.techStack">
+            <span v-for="tag in getTechTags(project.techStack)" :key="tag" class="project-tag">{{ tag }}</span>
           </div>
         </div>
-      </div>
+      </a>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { FolderOpen } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
+import { FolderOpen, Code } from 'lucide-vue-next'
+import { getProjects, type Project } from '@/api/project'
 
-interface Project {
-  id: number
-  title: string
-  description: string
-  icon: any
-  tags: string[]
+const projects = ref<Project[]>([])
+const loading = ref(false)
+
+// 解析技术栈标签
+function getTechTags(techStack: string): string[] {
+  if (!techStack) return []
+  return techStack.split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 3)
 }
 
-interface Props {
-  projects?: Project[]
+// 加载项目数据
+async function loadProjects() {
+  loading.value = true
+  try {
+    // 只获取状态为1（进行中）的项目，最多显示3个
+    const data = await getProjects(1)
+    projects.value = data.slice(0, 3)
+  } catch (error) {
+    console.error('加载项目失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  projects: () => []
+onMounted(() => {
+  loadProjects()
 })
-
-const projects = ref<Project[]>(props.projects)
 </script>
 
 <style scoped>
 .project-gallery-wrapper {
   width: 100%;
+}
+
+/* 加载状态 */
+.project-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-3xl);
+  min-height: 280px;
+  color: var(--color-gray-500);
+  font-size: var(--text-sm);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-400);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 项目封面图 */
+.project-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
 }
 
 /* 空状态 */

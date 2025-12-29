@@ -110,12 +110,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { X, Upload, Edit, Trash2, Loader } from 'lucide-vue-next'
+import { uploadFile } from '@/api/upload'
+import { message } from '@/utils/message'
 
 interface ImageFormData {
   title: string
   description: string
   category: string
   status: number
+  imageUrl?: string
+  thumbnailUrl?: string
 }
 
 interface Props {
@@ -126,7 +130,7 @@ defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
-  submit: [data: ImageFormData & { file: File }]
+  submit: [data: ImageFormData]
 }>()
 
 const fileInput = ref<HTMLInputElement>()
@@ -154,13 +158,13 @@ function handleFileChange(event: Event) {
 
   // 验证文件类型
   if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
+    message.error('请选择图片文件')
     return
   }
 
   // 验证文件大小（5MB）
   if (file.size > 5 * 1024 * 1024) {
-    alert('图片大小不能超过 5MB')
+    message.error('图片大小不能超过 5MB')
     return
   }
 
@@ -212,29 +216,26 @@ async function handleSubmit() {
   uploadProgress.value = 0
 
   try {
-    // 模拟上传进度
-    const interval = setInterval(() => {
-      uploadProgress.value += 10
-      if (uploadProgress.value >= 90) {
-        clearInterval(interval)
-      }
-    }, 200)
+    // 上传文件到服务器
+    uploadProgress.value = 30
+    const uploadResult = await uploadFile(selectedFile.value)
+    uploadProgress.value = 80
 
-    // 模拟API调用
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    // 获取上传后的 URL
+    const imageUrl = uploadResult.url || uploadResult
 
     uploadProgress.value = 100
-    clearInterval(interval)
 
     emit('submit', {
       ...formData.value,
-      file: selectedFile.value
+      imageUrl: imageUrl,
+      thumbnailUrl: imageUrl
     })
 
     handleClose()
   } catch (error) {
     console.error('上传失败:', error)
-    alert('上传失败，请重试')
+    message.error('上传失败，请重试')
   } finally {
     uploading.value = false
   }

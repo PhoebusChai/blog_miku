@@ -1,7 +1,13 @@
 <template>
   <div class="life-gallery-wrapper">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="life-loading">
+      <div class="loading-spinner"></div>
+      <span>加载中...</span>
+    </div>
+
     <!-- 空状态 -->
-    <div v-if="photos.length === 0" class="life-empty">
+    <div v-else-if="photos.length === 0" class="life-empty">
       <div class="life-empty-icon">
         <Image :size="48" />
       </div>
@@ -14,11 +20,11 @@
       <div class="life-item" v-for="photo in photos" :key="photo.id">
         <div class="photo-frame">
           <div class="photo-image">
-            <img :src="photo.url" :alt="photo.location" loading="lazy" />
+            <img :src="photo.imageUrl" :alt="photo.title || '生活瞬间'" loading="lazy" />
           </div>
           <div class="photo-caption">
-            <p class="photo-location">{{ photo.location }}</p>
-            <p class="photo-date">{{ photo.date }}</p>
+            <p class="photo-location">{{ photo.title || photo.category || '生活' }}</p>
+            <p class="photo-date">{{ formatDate(photo.createdAt) }}</p>
           </div>
         </div>
       </div>
@@ -27,30 +33,70 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Image } from 'lucide-vue-next'
+import { getVisibleGallery, type Gallery } from '@/api/gallery'
 
-interface Photo {
-  id: number
-  url: string
-  location: string
-  date: string
+const photos = ref<Gallery[]>([])
+const loading = ref(false)
+
+// 格式化日期
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 
-interface Props {
-  photos?: Photo[]
+// 加载图片数据
+async function loadGallery() {
+  loading.value = true
+  try {
+    const data = await getVisibleGallery()
+    // 最多显示6张图片
+    photos.value = data.slice(0, 6)
+  } catch (error) {
+    console.error('加载图片失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  photos: () => []
+onMounted(() => {
+  loadGallery()
 })
-
-const photos = ref<Photo[]>(props.photos)
 </script>
 
 <style scoped>
 .life-gallery-wrapper {
   width: 100%;
+}
+
+/* 加载状态 */
+.life-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-3xl);
+  min-height: 280px;
+  color: var(--color-gray-500);
+  font-size: var(--text-sm);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-400);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 空状态 */

@@ -5,7 +5,7 @@
       <div class="action-bar-left">
         <div class="stats-info">
           <span class="stat-label">图片总数：</span>
-          <span class="stat-value">{{ images.length }}</span>
+          <span class="stat-value">{{ stats.total }}</span>
         </div>
       </div>
       <div class="action-bar-center">
@@ -20,11 +20,9 @@
           />
           <button class="search-btn" @click="handleSearch">搜索</button>
         </div>
-        <select v-model="categoryFilter" class="filter-select">
+        <select v-model="categoryFilter" class="filter-select" @change="handleCategoryChange">
           <option value="">全部分类</option>
-          <option value="头像">头像</option>
-          <option value="横幅">横幅</option>
-          <option value="文章配图">文章配图</option>
+          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
         </select>
       </div>
       <div class="action-bar-right">
@@ -60,13 +58,13 @@
           <div class="image-preview">
             <img :src="image.imageUrl" :alt="image.title" />
             <div class="image-overlay">
-              <button class="overlay-btn" title="查看" @click="handleView(image.id)">
+              <button class="overlay-btn" title="查看" @click="handleView(image.id!)">
                 <Eye :size="18" />
               </button>
               <button class="overlay-btn" title="复制链接" @click="handleCopy(image.imageUrl)">
                 <Copy :size="18" />
               </button>
-              <button class="overlay-btn" title="删除" @click="handleDelete(image.id)">
+              <button class="overlay-btn" title="删除" @click="handleDelete(image.id!)">
                 <Trash2 :size="18" />
               </button>
             </div>
@@ -121,11 +119,11 @@
             <td class="col-category">
               <span class="category-badge">{{ image.category }}</span>
             </td>
-            <td class="col-size">{{ image.size || '未知' }}</td>
+            <td class="col-size">{{ (image as any).size || '未知' }}</td>
             <td class="col-date">{{ image.createdAt }}</td>
             <td class="col-actions">
               <div class="actions-cell">
-                <button class="action-icon-btn" title="查看" @click="handleView(image.id)">
+                <button class="action-icon-btn" title="查看" @click="handleView(image.id!)">
                   <Eye :size="16" />
                 </button>
                 <button
@@ -135,7 +133,7 @@
                 >
                   <Copy :size="16" />
                 </button>
-                <button class="action-icon-btn" title="删除" @click="handleDelete(image.id)">
+                <button class="action-icon-btn" title="删除" @click="handleDelete(image.id!)">
                   <Trash2 :size="16" />
                 </button>
               </div>
@@ -188,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   Search,
   Upload,
@@ -202,6 +200,15 @@ import {
   ChevronRight
 } from 'lucide-vue-next'
 import ImageUploadModal from './ImageUploadModal.vue'
+import {
+  getAdminGallery,
+  getGalleryCategories,
+  getGalleryStats,
+  createGallery,
+  deleteGallery,
+  type Gallery
+} from '@/api/gallery'
+import { message } from '@/utils/message'
 
 // 状态
 const searchKeyword = ref('')
@@ -210,43 +217,53 @@ const viewMode = ref<'grid' | 'list'>('grid')
 const currentPage = ref(1)
 const pageSize = ref(12)
 const showModal = ref(false)
+const loading = ref(false)
+const categories = ref<string[]>([])
+const stats = ref({ total: 0, categories: 0 })
 
-// Mock 数据
-const images = ref([
-  {
-    id: 1,
-    title: '个人头像',
-    description: '用于个人资料的头像图片',
-    imageUrl: 'https://via.placeholder.com/300',
-    thumbnailUrl: 'https://via.placeholder.com/150',
-    category: '头像',
-    size: '300x300',
-    status: 1,
-    createdAt: '2024-12-19'
-  },
-  {
-    id: 2,
-    title: '网站横幅',
-    description: '首页展示的横幅图片',
-    imageUrl: 'https://via.placeholder.com/800x400',
-    thumbnailUrl: 'https://via.placeholder.com/400x200',
-    category: '横幅',
-    size: '800x400',
-    status: 1,
-    createdAt: '2024-12-18'
-  },
-  {
-    id: 3,
-    title: '文章封面',
-    description: '博客文章的封面配图',
-    imageUrl: 'https://via.placeholder.com/600x400',
-    thumbnailUrl: 'https://via.placeholder.com/300x200',
-    category: '文章配图',
-    size: '600x400',
-    status: 1,
-    createdAt: '2024-12-17'
+// 图片数据
+const images = ref<Gallery[]>([])
+
+// 加载图片列表
+async function loadImages() {
+  loading.value = true
+  try {
+    const res = await getAdminGallery(categoryFilter.value || undefined)
+    images.value = res || []
+  } catch (error) {
+    console.error('加载图片失败:', error)
+    message.error('加载图片失败')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 加载分类列表
+async function loadCategories() {
+  try {
+    const res = await getGalleryCategories()
+    categories.value = res || []
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+}
+
+// 加载统计数据
+async function loadStats() {
+  try {
+    const res = await getGalleryStats()
+    stats.value = res || { total: 0, categories: 0 }
+  } catch (error) {
+    console.error('加载统计失败:', error)
+  }
+}
+
+// 初始化
+onMounted(() => {
+  loadImages()
+  loadCategories()
+  loadStats()
+})
 
 // 筛选图片
 const filteredImages = computed(() => {
@@ -315,7 +332,12 @@ const displayPages = computed(() => {
 
 // 方法
 function handleSearch() {
-  console.log('搜索关键词:', searchKeyword.value)
+  currentPage.value = 1
+}
+
+function handleCategoryChange() {
+  currentPage.value = 1
+  loadImages()
 }
 
 function handleUpload() {
@@ -323,40 +345,54 @@ function handleUpload() {
 }
 
 function handleView(id: number) {
-  console.log('查看图片:', id)
-  // TODO: 实现图片预览功能
+  const image = images.value.find((img) => img.id === id)
+  if (image) {
+    window.open(image.imageUrl, '_blank')
+  }
 }
 
-function handleCopy(url: string) {
-  navigator.clipboard.writeText(url)
-  alert('图片链接已复制到剪贴板')
+async function handleCopy(url: string) {
+  try {
+    await navigator.clipboard.writeText(url)
+    message.success('图片链接已复制到剪贴板')
+  } catch {
+    message.error('复制失败')
+  }
 }
 
-function handleDelete(id: number) {
+async function handleDelete(id: number) {
   if (confirm('确定要删除这张图片吗？')) {
-    const index = images.value.findIndex((img) => img.id === id)
-    if (index !== -1) {
-      images.value.splice(index, 1)
-      console.log('删除图片:', id)
+    try {
+      await deleteGallery(id)
+      message.success('删除成功')
+      loadImages()
+      loadStats()
+    } catch (error) {
+      console.error('删除失败:', error)
+      message.error('删除失败')
     }
   }
 }
 
-function handleModalSubmit(data: any) {
-  const newImage = {
-    id: images.value.length + 1,
-    title: data.title || '未命名图片',
-    description: data.description,
-    imageUrl: URL.createObjectURL(data.file),
-    thumbnailUrl: URL.createObjectURL(data.file),
-    category: data.category || '其他',
-    size: '未知',
-    status: data.status,
-    createdAt: new Date().toISOString().split('T')[0]
+async function handleModalSubmit(data: any) {
+  try {
+    await createGallery({
+      title: data.title || '未命名图片',
+      description: data.description,
+      imageUrl: data.imageUrl,
+      thumbnailUrl: data.thumbnailUrl || data.imageUrl,
+      category: data.category || '其他',
+      status: data.status ?? 1
+    })
+    message.success('上传成功')
+    showModal.value = false
+    loadImages()
+    loadStats()
+    loadCategories()
+  } catch (error) {
+    console.error('上传失败:', error)
+    message.error('上传失败')
   }
-  images.value.push(newImage)
-  console.log('上传图片:', newImage)
-  showModal.value = false
 }
 </script>
 

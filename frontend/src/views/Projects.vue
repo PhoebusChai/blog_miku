@@ -129,13 +129,15 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Star, GitFork, ExternalLink, ArrowUp, Rocket, Sparkles, Code, Inbox } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import { getProjects, type Project } from '@/api/project'
+import { message } from '@/utils/message'
 
 const loading = ref(true)
 const showBackToTop = ref(false)
 const activeFilter = ref('all')
-const sortBy = ref('stars')
+const sortBy = ref('latest')
 
-interface Project {
+interface DisplayProject {
   id: number
   name: string
   description: string
@@ -151,129 +153,80 @@ interface Project {
 
 const filters = [
   { label: '全部', value: 'all' },
-  { label: 'Vue', value: 'vue' },
-  { label: 'React', value: 'react' },
-  { label: 'TypeScript', value: 'typescript' },
-  { label: '工具', value: 'tools' }
+  { label: '进行中', value: 'active' },
+  { label: '已完成', value: 'completed' },
+  { label: '已归档', value: 'archived' }
 ]
 
 const sortOptions = [
-  { label: '最多 Star', value: 'stars' },
-  { label: '最多 Fork', value: 'forks' },
+  { label: '最新', value: 'latest' },
+  { label: '最多浏览', value: 'views' },
   { label: '按名称', value: 'name' }
 ]
 
-const projects = ref<Project[]>([
-  {
-    id: 1,
-    name: '个人博客系统',
-    description: '基于 Vue 3 + TypeScript 开发的现代化博客系统，支持文章管理、标签分类、评论互动等功能。',
-    cover: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&h=600&fit=crop',
-    tags: ['Vue 3', 'TypeScript', 'Vite'],
-    stars: 128,
-    forks: 32,
-    url: 'https://github.com',
-    category: 'vue',
-    language: 'TypeScript',
-    featured: true
-  },
-  {
-    id: 2,
-    name: 'UI 组件库',
-    description: '轻量级的 Vue 3 组件库，提供常用的 UI 组件，支持主题定制和按需引入。',
-    cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=600&fit=crop',
-    tags: ['Vue 3', 'Components', 'CSS'],
-    stars: 256,
-    forks: 48,
-    url: 'https://github.com',
-    category: 'vue',
-    language: 'Vue',
-    featured: true
-  },
-  {
-    id: 3,
-    name: '在线代码编辑器',
-    description: '支持多语言的在线代码编辑器，提供语法高亮、代码补全、实时预览等功能。',
-    cover: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=600&fit=crop',
-    tags: ['React', 'Monaco Editor', 'WebAssembly'],
-    stars: 189,
-    forks: 41,
-    url: 'https://github.com',
-    category: 'react',
-    language: 'JavaScript'
-  },
-  {
-    id: 4,
-    name: '任务管理工具',
-    description: '简洁高效的任务管理工具，支持项目分组、任务标签、进度跟踪等功能。',
-    cover: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&h=600&fit=crop',
-    tags: ['Vue 3', 'Pinia', 'IndexedDB'],
-    stars: 94,
-    forks: 23,
-    url: 'https://github.com',
-    category: 'vue',
-    language: 'TypeScript'
-  },
-  {
-    id: 5,
-    name: 'Markdown 编辑器',
-    description: '功能丰富的 Markdown 编辑器，支持实时预览、导出 PDF、图片上传等功能。',
-    cover: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&h=600&fit=crop',
-    tags: ['TypeScript', 'Markdown', 'Electron'],
-    stars: 312,
-    forks: 67,
-    url: 'https://github.com',
-    category: 'tools',
-    language: 'TypeScript',
-    featured: true
-  },
-  {
-    id: 6,
-    name: '数据可视化平台',
-    description: '基于 ECharts 的数据可视化平台，提供丰富的图表类型和交互功能。',
-    cover: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop',
-    tags: ['Vue 3', 'ECharts', 'D3.js'],
-    stars: 176,
-    forks: 38,
-    url: 'https://github.com',
-    category: 'vue',
-    language: 'JavaScript'
+const projects = ref<DisplayProject[]>([])
+
+// 转换API数据为显示格式
+function convertProject(project: Project): DisplayProject {
+  const tags = project.techStack ? project.techStack.split(',').map(t => t.trim()).filter(Boolean) : []
+  return {
+    id: project.id || 0,
+    name: project.title,
+    description: project.description || '暂无描述',
+    cover: project.coverImage || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=600&fit=crop',
+    tags,
+    stars: 0,
+    forks: 0,
+    url: project.demoUrl || project.githubUrl || '#',
+    category: getStatusCategory(project.status),
+    language: tags[0] || '',
+    featured: project.sortOrder !== undefined && project.sortOrder > 0
   }
-])
+}
+
+function getStatusCategory(status?: number): string {
+  switch (status) {
+    case 1: return 'active'
+    case 2: return 'completed'
+    case 3: return 'archived'
+    default: return 'active'
+  }
+}
 
 const filteredProjects = computed(() => {
   let result = projects.value
 
   // 筛选
   if (activeFilter.value !== 'all') {
-    result = result.filter(project => {
-      if (activeFilter.value === 'vue') {
-        return project.category === 'vue'
-      } else if (activeFilter.value === 'react') {
-        return project.category === 'react'
-      } else if (activeFilter.value === 'typescript') {
-        return project.tags.some(tag => tag.toLowerCase().includes('typescript'))
-      } else if (activeFilter.value === 'tools') {
-        return project.category === 'tools'
-      }
-      return true
-    })
+    result = result.filter(project => project.category === activeFilter.value)
   }
 
   // 排序
   result = [...result].sort((a, b) => {
-    if (sortBy.value === 'stars') {
+    if (sortBy.value === 'views') {
       return b.stars - a.stars
-    } else if (sortBy.value === 'forks') {
-      return b.forks - a.forks
     } else if (sortBy.value === 'name') {
       return a.name.localeCompare(b.name)
     }
-    return 0
+    // 默认按最新（id倒序）
+    return b.id - a.id
   })
 
   return result
 })
+
+// 加载项目数据
+async function loadProjects() {
+  loading.value = true
+  try {
+    const data = await getProjects()
+    projects.value = data.map(convertProject)
+  } catch (error: any) {
+    message.error(error.message || '加载项目失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 function formatNumber(num: number): string {
   if (num >= 1000) {
@@ -293,10 +246,8 @@ function scrollToTop() {
   })
 }
 
-onMounted(() => {
-  setTimeout(() => {
-    loading.value = false
-  }, 500)
+onMounted(async () => {
+  await loadProjects()
   window.addEventListener('scroll', handleScroll)
 })
 

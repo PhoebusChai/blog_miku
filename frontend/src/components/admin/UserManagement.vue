@@ -7,23 +7,23 @@
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'all' }"
-            @click="activeTab = 'all'"
+            @click="handleTabChange('all')"
           >
-            全部 ({{ users.length }})
+            全部 ({{ stats.total }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'admin' }"
-            @click="activeTab = 'admin'"
+            @click="handleTabChange('admin')"
           >
-            管理员
+            管理员 ({{ stats.admins }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'user' }"
-            @click="activeTab = 'user'"
+            @click="handleTabChange('user')"
           >
-            普通用户
+            普通用户 ({{ stats.users }})
           </button>
         </div>
       </div>
@@ -76,7 +76,7 @@
               </div>
             </td>
             <td class="col-role">
-              <span class="role-badge" :class="`role-${user.role}`">
+              <span class="role-badge" :class="`role-${user.role ?? 0}`">
                 {{ getRoleText(user.role) }}
               </span>
             </td>
@@ -84,43 +84,45 @@
               <div class="stats-cell">
                 <span class="stat-item">
                   <FileText :size="14" />
-                  {{ user.articleCount }} 篇文章
+                  {{ (user as any).articleCount ?? 0 }} 篇文章
                 </span>
                 <span class="stat-item">
                   <MessageSquare :size="14" />
-                  {{ user.commentCount }} 条评论
+                  {{ (user as any).commentCount ?? 0 }} 条评论
                 </span>
               </div>
             </td>
             <td class="col-status">
-              <span class="status-badge" :class="`status-${user.status}`">
+              <span class="status-badge" :class="`status-${user.status ?? 0}`">
                 {{ getStatusText(user.status) }}
               </span>
             </td>
             <td class="col-date">{{ user.createdAt }}</td>
             <td class="col-actions">
               <div class="actions-cell">
-                <button class="action-icon-btn" title="编辑" @click="handleEdit(user.id)">
-                  <Edit :size="16" />
+                <button class="action-icon-btn" type="button" title="编辑" @click.stop="handleEdit(user.id!)">
+                  <Edit :size="16" style="pointer-events: none" />
                 </button>
                 <button
                   v-if="user.status === 1"
                   class="action-icon-btn"
+                  type="button"
                   title="禁用"
-                  @click="handleDisable(user.id)"
+                  @click.stop="handleDisable(user.id!)"
                 >
-                  <Ban :size="16" />
+                  <Ban :size="16" style="pointer-events: none" />
                 </button>
                 <button
                   v-else
                   class="action-icon-btn"
+                  type="button"
                   title="启用"
-                  @click="handleEnable(user.id)"
+                  @click.stop="handleEnable(user.id!)"
                 >
-                  <CheckCircle :size="16" />
+                  <CheckCircle :size="16" style="pointer-events: none" />
                 </button>
-                <button class="action-icon-btn" title="删除" @click="handleDelete(user.id)">
-                  <Trash2 :size="16" />
+                <button class="action-icon-btn" type="button" title="删除" @click.stop="handleDelete(user.id!)">
+                  <Trash2 :size="16" style="pointer-events: none" />
                 </button>
               </div>
             </td>
@@ -165,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   Search,
   UserPlus,
@@ -180,14 +182,20 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-vue-next'
+import {
+  getAdminUsers,
+  getUserStats,
+  enableUser,
+  disableUser,
+  deleteUser as deleteUserApi,
+  type User as UserType
+} from '@/api/user'
+import { message } from '@/utils/message'
 
 // Emits
 const emit = defineEmits<{
   create: []
   edit: [id: number]
-  disable: [id: number]
-  enable: [id: number]
-  delete: [id: number]
 }>()
 
 // 状态
@@ -195,53 +203,57 @@ const activeTab = ref('all')
 const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const loading = ref(false)
+const stats = ref({
+  total: 0,
+  admins: 0,
+  users: 0,
+  active: 0,
+  disabled: 0
+})
 
-// Mock 数据
-const users = ref([
-  {
-    id: 1,
-    name: '管理员',
-    email: 'admin@example.com',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-    role: 1, // 0-普通用户，1-管理员
-    status: 1, // 0-禁用，1-正常
-    articleCount: 12,
-    commentCount: 45,
-    createdAt: '2024-01-01'
-  },
-  {
-    id: 2,
-    name: '张三',
-    email: 'zhangsan@example.com',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhangsan',
-    role: 0,
-    status: 1,
-    articleCount: 0,
-    commentCount: 8,
-    createdAt: '2024-12-15'
-  },
-  {
-    id: 3,
-    name: '李四',
-    email: 'lisi@example.com',
-    avatar: '',
-    role: 0,
-    status: 0,
-    articleCount: 0,
-    commentCount: 2,
-    createdAt: '2024-12-10'
+// 用户数据
+const users = ref<UserType[]>([])
+
+// 加载用户列表
+async function loadUsers() {
+  loading.value = true
+  try {
+    const params: { role?: number; status?: number } = {}
+    if (activeTab.value === 'admin') {
+      params.role = 1
+    } else if (activeTab.value === 'user') {
+      params.role = 0
+    }
+    const res = await getAdminUsers(params)
+    users.value = res || []
+  } catch (error) {
+    console.error('加载用户失败:', error)
+    message.error('加载用户失败')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 加载统计数据
+async function loadStats() {
+  try {
+    const res = await getUserStats()
+    stats.value = res || { total: 0, admins: 0, users: 0, active: 0, disabled: 0 }
+  } catch (error) {
+    console.error('加载统计失败:', error)
+  }
+}
+
+// 初始化
+onMounted(() => {
+  loadUsers()
+  loadStats()
+})
 
 // 筛选用户
 const filteredUsers = computed(() => {
   let result = users.value
-
-  if (activeTab.value === 'admin') {
-    result = result.filter((u) => u.role === 1)
-  } else if (activeTab.value === 'user') {
-    result = result.filter((u) => u.role === 0)
-  }
 
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
@@ -299,20 +311,26 @@ const displayPages = computed(() => {
 })
 
 // 方法
-function getRoleText(role: number): string {
+function getRoleText(role: number | undefined): string {
   const roleMap: Record<number, string> = {
     0: '普通用户',
     1: '管理员'
   }
-  return roleMap[role] || '未知'
+  return roleMap[role ?? 0] || '未知'
 }
 
-function getStatusText(status: number): string {
+function getStatusText(status: number | undefined): string {
   const statusMap: Record<number, string> = {
     0: '已禁用',
     1: '正常'
   }
-  return statusMap[status] || '未知'
+  return statusMap[status ?? 0] || '未知'
+}
+
+function handleTabChange(tab: string) {
+  activeTab.value = tab
+  currentPage.value = 1
+  loadUsers()
 }
 
 function handleCreate() {
@@ -323,25 +341,48 @@ function handleEdit(id: number) {
   emit('edit', id)
 }
 
-function handleDisable(id: number) {
+async function handleDisable(id: number) {
   if (confirm('确定要禁用这个用户吗？')) {
-    emit('disable', id)
+    try {
+      await disableUser(id)
+      message.success('用户已禁用')
+      loadUsers()
+      loadStats()
+    } catch (error) {
+      console.error('禁用失败:', error)
+      message.error('禁用失败')
+    }
   }
 }
 
-function handleEnable(id: number) {
-  emit('enable', id)
+async function handleEnable(id: number) {
+  try {
+    await enableUser(id)
+    message.success('用户已启用')
+    loadUsers()
+    loadStats()
+  } catch (error) {
+    console.error('启用失败:', error)
+    message.error('启用失败')
+  }
 }
 
-function handleDelete(id: number) {
+async function handleDelete(id: number) {
   if (confirm('确定要删除这个用户吗？此操作不可恢复。')) {
-    emit('delete', id)
+    try {
+      await deleteUserApi(id)
+      message.success('删除成功')
+      loadUsers()
+      loadStats()
+    } catch (error) {
+      console.error('删除失败:', error)
+      message.error('删除失败')
+    }
   }
 }
 
 function handleSearch() {
-  // 搜索逻辑已通过 computed 自动处理
-  console.log('搜索关键词:', searchKeyword.value)
+  currentPage.value = 1
 }
 </script>
 

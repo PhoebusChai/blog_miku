@@ -153,6 +153,16 @@ export function markCommentAsSpam(id: number) {
 }
 
 /**
+ * 恢复评论（从垃圾评论恢复为待审核）
+ */
+export function restoreComment(id: number) {
+  return request<void>({
+    url: `/comments/${id}/restore`,
+    method: 'put'
+  })
+}
+
+/**
  * 批量删除评论
  */
 export function batchDeleteComments(ids: number[]) {

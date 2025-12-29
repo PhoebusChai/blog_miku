@@ -44,9 +44,9 @@
                 required
               ></textarea>
             </div>
-            <button type="submit" class="submit-btn">
+            <button type="submit" class="submit-btn" :disabled="submitting">
               <Send :size="16" />
-              发送留言
+              {{ submitting ? '发送中...' : '发送留言' }}
             </button>
           </form>
         </div>
@@ -85,7 +85,10 @@
 
           <div class="recent-visitors">
             <h4 class="recent-title">最近访客</h4>
-            <div class="visitor-list">
+            <div v-if="recentVisitorsList.length === 0" class="visitors-empty">
+              <span>暂无访客</span>
+            </div>
+            <div v-else class="visitor-list">
               <div
                 v-for="visitor in recentVisitorsList"
                 :key="visitor.id"
@@ -105,44 +108,40 @@
           <div class="loading-spinner"></div>
           <p>加载中...</p>
         </div>
+        
+        <!-- 空状态 -->
+        <div v-else-if="messages.length === 0" class="empty-state">
+          <MessageSquare :size="48" />
+          <p>还没有留言，来写下第一条吧！</p>
+        </div>
+        
         <div v-else class="messages">
           <article
-            v-for="message in messages"
-            :key="message.id"
+            v-for="msg in messages"
+            :key="msg.id"
             class="message-item"
           >
             <div class="message-header">
               <div class="message-avatar">
-                <img :src="message.avatar" :alt="message.name" />
+                <img :src="msg.avatar" :alt="msg.name" />
               </div>
               <div class="message-info">
-                <span class="message-name">{{ message.name }}</span>
+                <span class="message-name">{{ msg.name }}</span>
               </div>
             </div>
-            <p class="message-text">{{ message.content }}</p>
+            <p class="message-text">{{ msg.content }}</p>
             <div class="message-footer">
-              <span class="message-time">{{ formatDate(message.createdAt) }}</span>
+              <span class="message-time">{{ formatDate(msg.createdAt) }}</span>
               <button 
                 class="like-btn" 
-                :class="{ 'liked': message.liked }"
-                @click.stop="toggleLike(message.id)"
+                :class="{ 'liked': msg.liked }"
+                @click.stop="toggleLike(msg.id)"
               >
-                <Heart :size="16" :fill="message.liked ? 'currentColor' : 'none'" />
-                <span>{{ message.likes }}</span>
+                <Heart :size="16" :fill="msg.liked ? 'currentColor' : 'none'" />
+                <span>{{ msg.likes }}</span>
               </button>
             </div>
           </article>
-        </div>
-        
-        <!-- 加载更多指示器 -->
-        <div v-if="loadingMore" class="loading-more">
-          <div class="loading-spinner"></div>
-          <p>加载更多...</p>
-        </div>
-        
-        <!-- 没有更多数据提示 -->
-        <div v-if="!hasMore && messages.length > 0" class="no-more">
-          <p>没有更多留言了 ~</p>
         </div>
       </div>
     </main>
@@ -168,24 +167,34 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Send, ArrowUp, MessageSquare, Users, Clock, Heart, PenLine } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import { getGuestbookComments, createComment, likeComment, unlikeComment, type Comment } from '@/api/comment'
+import { message } from '@/utils/message'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const loading = ref(true)
-const loadingMore = ref(false)
-const hasMore = ref(true)
-const page = ref(1)
+const submitting = ref(false)
 const showBackToTop = ref(false)
 
 // 统计数据
-const uniqueVisitors = ref(128)
-const recentMessages = ref(8)
-const recentVisitorsList = ref([
-  { id: 1, name: '访客1', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor1' },
-  { id: 2, name: '访客2', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor2' },
-  { id: 3, name: '访客3', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor3' },
-  { id: 4, name: '访客4', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor4' },
-  { id: 5, name: '访客5', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor5' },
-  { id: 6, name: '访客6', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Visitor6' }
-])
+const uniqueVisitors = computed(() => {
+  const names = new Set(messages.value.map(m => m.name))
+  return names.size
+})
+
+const recentMessages = computed(() => {
+  const today = new Date().toDateString()
+  return messages.value.filter(m => new Date(m.createdAt).toDateString() === today).length
+})
+
+const recentVisitorsList = computed(() => {
+  const visitors = messages.value.slice(0, 6).map(m => ({
+    id: m.id,
+    name: m.name,
+    avatar: m.avatar
+  }))
+  return visitors
+})
 
 interface Message {
   id: number
@@ -204,143 +213,61 @@ const form = ref({
   content: ''
 })
 
-const messages = ref<Message[]>([
-  {
-    id: 1,
-    name: '张三',
-    content: '很棒的博客，期待更多精彩内容！',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Zhang',
-    createdAt: '2024-01-15',
-    likes: 12,
-    liked: false
-  },
-  {
-    id: 2,
-    name: '李四',
-    content: '文章写得很好，学到了很多东西。',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Li',
-    createdAt: '2024-01-14',
-    likes: 8,
-    liked: false
-  },
-  {
-    id: 3,
-    name: '王五',
-    content: '界面设计很漂亮，用户体验很棒！',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Wang',
-    createdAt: '2024-01-13',
-    likes: 15,
-    liked: false
-  },
-  {
-    id: 4,
-    name: '赵六',
-    content: '技术分享很实用，收藏了！',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Zhao',
-    createdAt: '2024-01-12',
-    likes: 6,
-    liked: false
-  },
-  {
-    id: 5,
-    name: '小明',
-    content: '代码示例很清晰，感谢分享！',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ming',
-    createdAt: '2024-01-11',
-    likes: 20,
-    liked: false
-  },
-  {
-    id: 6,
-    name: '小红',
-    content: '博客内容质量很高，持续关注中~',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hong',
-    createdAt: '2024-01-10',
-    likes: 10,
-    liked: false
-  }
-])
+const messages = ref<Message[]>([])
 
-// 点赞功能
-function toggleLike(messageId: number) {
-  const message = messages.value.find(m => m.id === messageId)
-  if (message) {
-    if (message.liked) {
-      message.likes--
-      message.liked = false
-    } else {
-      message.likes++
-      message.liked = true
-    }
+// 转换API数据为Message格式
+function convertComment(comment: Comment): Message {
+  return {
+    id: comment.id || 0,
+    name: comment.userName || comment.guestName || '匿名用户',
+    email: comment.guestEmail,
+    content: comment.content,
+    avatar: comment.userAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.guestName || comment.id}`,
+    createdAt: comment.createdAt || new Date().toISOString(),
+    likes: comment.likeCount || 0,
+    liked: false
   }
 }
 
-// 模拟加载更多数据
-const mockNames = ['小刚', '小美', '小华', '小丽', '小强', '小芳', '小军', '小雪']
-const mockContents = [
-  '1非常实用的内容，感谢分享！非常实用的内容，感谢分享！非常实用的内容，感谢分享！非常实用的内容，感谢分享！',
-  '学到了很多新知识，继续加油！',
-  '写得很详细，很有帮助！',
-  '期待更多优质内容！',
-  '界面很美观，体验很好！',
-  '内容很有深度，值得学习！',
-  '代码质量很高，赞一个！',
-  '文章结构清晰，易于理解！'
-]
+// 加载留言数据
+async function loadMessages() {
+  loading.value = true
+  try {
+    const data = await getGuestbookComments()
+    messages.value = data.comments.map(convertComment)
+  } catch (error: any) {
+    message.error(error.message || '加载留言失败')
+  } finally {
+    loading.value = false
+  }
+}
 
-function loadMoreMessages() {
-  if (loadingMore.value || !hasMore.value) return
+// 点赞功能
+async function toggleLike(messageId: number) {
+  const msg = messages.value.find(m => m.id === messageId)
+  if (!msg) return
 
-  loadingMore.value = true
-  
-  // 模拟API请求
-  setTimeout(() => {
-    const newMessages: Message[] = []
-    const startId = messages.value.length + 1
-    
-    // 每次加载6条
-    for (let i = 0; i < 6; i++) {
-      const id = startId + i
-      const name = mockNames[Math.floor(Math.random() * mockNames.length)]
-      const content = mockContents[Math.floor(Math.random() * mockContents.length)]
-      const date = new Date()
-      date.setDate(date.getDate() - (messages.value.length + i + 1))
-      
-      newMessages.push({
-        id,
-        name,
-        content,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}${id}`,
-        createdAt: date.toISOString().split('T')[0],
-        likes: Math.floor(Math.random() * 20),
-        liked: false
-      })
+  try {
+    if (msg.liked) {
+      await unlikeComment(messageId)
+      msg.likes--
+      msg.liked = false
+    } else {
+      await likeComment(messageId)
+      msg.likes++
+      msg.liked = true
     }
-    
-    messages.value.push(...newMessages)
-    page.value++
-    loadingMore.value = false
-    
-    // 模拟最多加载3页
-    if (page.value >= 4) {
-      hasMore.value = false
-    }
-  }, 1000)
+  } catch (error: any) {
+    message.error(error.message || '操作失败')
+  }
 }
 
 // 滚动监听
 function handleScroll() {
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-  const windowHeight = window.innerHeight
-  const documentHeight = document.documentElement.scrollHeight
   
   // 显示/隐藏返回顶部按钮（滚动超过300px时显示）
   showBackToTop.value = scrollTop > 300
-  
-  // 距离底部200px时触发加载
-  if (scrollTop + windowHeight >= documentHeight - 200) {
-    loadMoreMessages()
-  }
 }
 
 // 返回顶部
@@ -351,20 +278,54 @@ function scrollToTop() {
   })
 }
 
-function submitMessage() {
-  console.log('Submit message:', form.value)
-  // TODO: 实现留言提交
-  form.value = { name: '', email: '', content: '' }
+async function submitMessage() {
+  if (!form.value.content.trim()) {
+    message.warning('请输入留言内容')
+    return
+  }
+
+  // 如果用户已登录，使用用户信息；否则需要填写昵称
+  if (!userStore.isLoggedIn && !form.value.name.trim()) {
+    message.warning('请输入昵称')
+    return
+  }
+
+  submitting.value = true
+  try {
+    const commentData: any = {
+      content: form.value.content.trim(),
+      articleId: 0 // 0 表示留言板
+    }
+
+    // 游客留言需要填写昵称和邮箱
+    if (!userStore.isLoggedIn) {
+      commentData.guestName = form.value.name.trim()
+      if (form.value.email.trim()) {
+        commentData.guestEmail = form.value.email.trim()
+      }
+    }
+
+    await createComment(commentData)
+    message.success('留言成功！')
+    
+    // 重置表单
+    form.value = { name: '', email: '', content: '' }
+    
+    // 重新加载留言列表
+    await loadMessages()
+  } catch (error: any) {
+    message.error(error.message || '留言失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
-onMounted(() => {
-  setTimeout(() => {
-    loading.value = false
-  }, 500)
+onMounted(async () => {
+  await loadMessages()
   
   // 添加滚动监听
   window.addEventListener('scroll', handleScroll)
@@ -625,6 +586,15 @@ onUnmounted(() => {
   margin: 0 0 var(--spacing-md) 0;
 }
 
+.visitors-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+  color: var(--color-gray-400);
+  font-size: var(--text-sm);
+}
+
 .visitor-list {
   display: flex;
   gap: var(--spacing-xs);
@@ -694,6 +664,33 @@ onUnmounted(() => {
   padding: var(--spacing-2xl) 0;
   color: var(--color-gray-400);
   font-size: var(--text-sm);
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-4xl) var(--spacing-2xl);
+  min-height: 300px;
+  text-align: center;
+  background: linear-gradient(135deg, var(--color-gray-50), var(--color-white));
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-gray-200);
+}
+
+.empty-state svg {
+  color: var(--color-miku-400);
+  opacity: 0.8;
+}
+
+.empty-state p {
+  font-size: var(--text-lg);
+  color: var(--color-gray-500);
+  margin: 0;
+  font-weight: var(--font-medium);
 }
 
 /* 留言网格 - Grid布局（固定位置） */

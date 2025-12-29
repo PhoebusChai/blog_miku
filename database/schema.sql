@@ -253,11 +253,27 @@ INSERT INTO article_tags (article_id, tag_id) VALUES
 
 -- 插入网站配置
 INSERT INTO site_config (config_key, config_value, config_type, description) VALUES
-('site_name', '我的个人博客', 0, '网站名称'),
-('site_description', '记录技术成长的个人博客', 0, '网站描述'),
-('site_keywords', 'Vue,TypeScript,前端开发,博客', 0, '网站关键词'),
-('site_author', '管理员', 0, '网站作者'),
-('site_icp', '', 0, 'ICP备案号'),
-('enable_comment', 'true', 2, '是否开启评论'),
-('comment_need_review', 'false', 2, '评论是否需要审核'),
-('articles_per_page', '10', 1, '每页文章数量');
+-- 基本设置
+('site_name', '落叶无痕的博客', 0, '网站名称'),
+('site_description', '分享技术、记录生活、探索世界', 0, '网站描述'),
+('site_keywords', 'Vue,TypeScript,前端开发,博客,技术分享', 0, '网站关键词'),
+('site_logo', '/logo.png', 0, '网站Logo'),
+('site_favicon', '/favicon.ico', 0, '网站图标'),
+('site_start_date', '2024-01-01', 0, '网站创建日期'),
+('site_copyright', '© 2024 落叶无痕. All rights reserved.', 0, '版权信息'),
+-- 博主信息
+('blogger_avatar', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix', 0, '博主头像'),
+('blogger_name', '落叶无痕', 0, '博主昵称'),
+('blogger_role', '全栈开发工程师', 0, '博主职位'),
+('blogger_location', '中国 · 北京', 0, '博主所在地'),
+('blogger_bio', '热爱编程，喜欢探索新技术。专注于前端开发，对用户体验和界面设计有着浓厚的兴趣。相信技术能够改变世界，代码可以创造美好。', 0, '博主简介'),
+('blogger_skills', 'Vue.js,TypeScript,Node.js,UI/UX', 0, '博主技能'),
+('blogger_interests', '编程,摄影,音乐,阅读,游戏,旅行', 0, '博主兴趣'),
+-- 社交媒体
+('social_github', 'https://github.com/username', 0, 'GitHub地址'),
+('social_bilibili', 'https://space.bilibili.com/uid', 0, '哔哩哔哩地址'),
+('social_email', 'contact@example.com', 0, '联系邮箱'),
+('social_twitter', '', 0, 'Twitter地址'),
+('social_weibo', '', 0, '微博地址'),
+('social_zhihu', '', 0, '知乎地址'),
+('social_wechat', '', 0, '微信公众号');

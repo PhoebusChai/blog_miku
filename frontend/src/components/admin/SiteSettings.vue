@@ -1,193 +1,219 @@
 <template>
   <div class="site-settings">
-    <!-- 设置导航 -->
-    <div class="settings-nav">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        class="nav-btn"
-        :class="{ active: activeTab === tab.id }"
-        @click="activeTab = tab.id"
-      >
-        <component :is="tab.icon" :size="18" />
-        <span>{{ tab.label }}</span>
-      </button>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>加载配置中...</p>
     </div>
 
-    <!-- 基本设置 -->
-    <div v-if="activeTab === 'basic'" class="settings-section">
-      <h2 class="section-title">基本设置</h2>
-      <div class="settings-form">
-        <div class="form-group">
-          <label class="form-label">网站名称</label>
-          <input v-model="settings.siteName" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">网站描述</label>
-          <textarea v-model="settings.siteDescription" class="form-textarea" rows="3" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">网站关键词</label>
-          <input v-model="settings.siteKeywords" type="text" class="form-input" />
-          <span class="form-hint">多个关键词用逗号分隔</span>
-        </div>
-        <div class="form-group">
-          <label class="form-label">网站Logo URL</label>
-          <input v-model="settings.siteLogo" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">网站图标 URL</label>
-          <input v-model="settings.siteFavicon" type="text" class="form-input" />
+    <template v-else>
+      <!-- 设置导航 -->
+      <div class="settings-nav">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="nav-btn"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
+        >
+          <component :is="tab.icon" :size="18" />
+          <span>{{ tab.label }}</span>
+        </button>
+      </div>
+
+      <!-- 基本设置 -->
+      <div v-if="activeTab === 'basic'" class="settings-section">
+        <h2 class="section-title">基本设置</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">网站名称</label>
+            <input v-model="settings.site_name" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">网站描述</label>
+            <textarea v-model="settings.site_description" class="form-textarea" rows="3" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">网站关键词</label>
+            <input v-model="settings.site_keywords" type="text" class="form-input" />
+            <span class="form-hint">多个关键词用逗号分隔</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">网站创建日期</label>
+            <input v-model="settings.site_start_date" type="date" class="form-input" />
+            <span class="form-hint">用于计算网站运行天数</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">版权信息</label>
+            <input v-model="settings.site_copyright" type="text" class="form-input" />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 社交媒体 -->
-    <div v-if="activeTab === 'social'" class="settings-section">
-      <h2 class="section-title">社交媒体</h2>
-      <div class="settings-form">
-        <div class="form-group">
-          <label class="form-label">GitHub</label>
-          <input v-model="settings.social.github" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Twitter</label>
-          <input v-model="settings.social.twitter" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">微博</label>
-          <input v-model="settings.social.weibo" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">邮箱</label>
-          <input v-model="settings.social.email" type="email" class="form-input" />
+      <!-- 博主信息 -->
+      <div v-if="activeTab === 'blogger'" class="settings-section">
+        <h2 class="section-title">博主信息</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">头像 URL</label>
+            <input v-model="settings.blogger_avatar" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">昵称</label>
+            <input v-model="settings.blogger_name" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">职位/角色</label>
+            <input v-model="settings.blogger_role" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">所在地</label>
+            <input v-model="settings.blogger_location" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">个人简介</label>
+            <textarea v-model="settings.blogger_bio" class="form-textarea" rows="4" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">技能标签</label>
+            <input v-model="settings.blogger_skills" type="text" class="form-input" />
+            <span class="form-hint">多个技能用逗号分隔，如：Vue.js, TypeScript, Node.js</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">兴趣爱好</label>
+            <input v-model="settings.blogger_interests" type="text" class="form-input" />
+            <span class="form-hint">多个爱好用逗号分隔，如：编程, 摄影, 音乐</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- SEO设置 -->
-    <div v-if="activeTab === 'seo'" class="settings-section">
-      <h2 class="section-title">SEO设置</h2>
-      <div class="settings-form">
-        <div class="form-group">
-          <label class="form-label">百度统计代码</label>
-          <textarea v-model="settings.seo.baiduAnalytics" class="form-textarea" rows="3" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Google Analytics ID</label>
-          <input v-model="settings.seo.googleAnalytics" type="text" class="form-input" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">网站验证代码</label>
-          <textarea v-model="settings.seo.verification" class="form-textarea" rows="3" />
-        </div>
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="settings.seo.enableSitemap" type="checkbox" />
-            <span>启用站点地图</span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="settings.seo.enableRobots" type="checkbox" />
-            <span>启用 robots.txt</span>
-          </label>
+      <!-- 社交媒体 -->
+      <div v-if="activeTab === 'social'" class="settings-section">
+        <h2 class="section-title">社交媒体</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">GitHub</label>
+            <input v-model="settings.social_github" type="text" class="form-input" placeholder="https://github.com/username" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">哔哩哔哩</label>
+            <input v-model="settings.social_bilibili" type="text" class="form-input" placeholder="https://space.bilibili.com/uid" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">邮箱</label>
+            <input v-model="settings.social_email" type="email" class="form-input" placeholder="contact@example.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Twitter / X</label>
+            <input v-model="settings.social_twitter" type="text" class="form-input" placeholder="https://twitter.com/username" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">微博</label>
+            <input v-model="settings.social_weibo" type="text" class="form-input" placeholder="https://weibo.com/username" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">知乎</label>
+            <input v-model="settings.social_zhihu" type="text" class="form-input" placeholder="https://zhihu.com/people/username" />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 评论设置 -->
-    <div v-if="activeTab === 'comment'" class="settings-section">
-      <h2 class="section-title">评论设置</h2>
-      <div class="settings-form">
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="settings.comment.enableComment" type="checkbox" />
-            <span>启用评论功能</span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="settings.comment.requireApproval" type="checkbox" />
-            <span>评论需要审核</span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="settings.comment.requireLogin" type="checkbox" />
-            <span>评论需要登录</span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="form-label">评论最大长度</label>
-          <input v-model.number="settings.comment.maxLength" type="number" class="form-input" />
-        </div>
+      <!-- 保存按钮 -->
+      <div class="settings-actions">
+        <button class="btn-secondary" @click="handleReset" :disabled="saving">重置</button>
+        <button class="btn-primary" @click="handleSave" :disabled="saving">
+          {{ saving ? '保存中...' : '保存设置' }}
+        </button>
       </div>
-    </div>
-
-    <!-- 保存按钮 -->
-    <div class="settings-actions">
-      <button class="btn-secondary" @click="handleReset">重置</button>
-      <button class="btn-primary" @click="handleSave">保存设置</button>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Globe, Share2, Search, MessageSquare } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
+import { Globe, Share2, User } from 'lucide-vue-next'
+import { getAllConfig, saveConfigs, type SiteConfig } from '@/api/config'
+import { useConfigStore } from '@/stores/config'
+import { message } from '@/utils/message'
 
+const configStore = useConfigStore()
 const activeTab = ref('basic')
+const loading = ref(true)
+const saving = ref(false)
 
 const tabs = [
   { id: 'basic', label: '基本设置', icon: Globe },
-  { id: 'social', label: '社交媒体', icon: Share2 },
-  { id: 'seo', label: 'SEO设置', icon: Search },
-  { id: 'comment', label: '评论设置', icon: MessageSquare }
+  { id: 'blogger', label: '博主信息', icon: User },
+  { id: 'social', label: '社交媒体', icon: Share2 }
 ]
 
-const settings = ref({
-  siteName: '我的博客',
-  siteDescription: '一个基于 Vue 3 的现代化博客系统',
-  siteKeywords: 'Vue,TypeScript,博客,前端开发',
-  siteLogo: '/logo.png',
-  siteFavicon: '/favicon.ico',
-  social: {
-    github: 'https://github.com/username',
-    twitter: 'https://twitter.com/username',
-    weibo: 'https://weibo.com/username',
-    email: 'contact@example.com'
-  },
-  seo: {
-    baiduAnalytics: '',
-    googleAnalytics: '',
-    verification: '',
-    enableSitemap: true,
-    enableRobots: true
-  },
-  comment: {
-    enableComment: true,
-    requireApproval: true,
-    requireLogin: false,
-    maxLength: 500
-  }
+const settings = ref<SiteConfig>({
+  // 基本设置
+  site_name: '',
+  site_description: '',
+  site_keywords: '',
+  site_start_date: '',
+  site_copyright: '',
+  // 博主信息
+  blogger_avatar: '',
+  blogger_name: '',
+  blogger_role: '',
+  blogger_location: '',
+  blogger_bio: '',
+  blogger_skills: '',
+  blogger_interests: '',
+  // 社交媒体
+  social_github: '',
+  social_bilibili: '',
+  social_email: '',
+  social_twitter: '',
+  social_weibo: '',
+  social_zhihu: ''
 })
 
-const emit = defineEmits<{
-  save: [settings: typeof settings.value]
-  reset: []
-}>()
-
-function handleSave() {
-  emit('save', settings.value)
-  alert('设置已保存')
-}
-
-function handleReset() {
-  if (confirm('确定要重置所有设置吗？')) {
-    emit('reset')
+// 加载配置
+async function loadSettings() {
+  loading.value = true
+  try {
+    const data = await getAllConfig()
+    // 合并配置
+    Object.keys(settings.value).forEach(key => {
+      if (data[key] !== undefined) {
+        settings.value[key] = data[key]
+      }
+    })
+  } catch (error: any) {
+    message.error(error.message || '加载配置失败')
+  } finally {
+    loading.value = false
   }
 }
+
+// 保存配置
+async function handleSave() {
+  saving.value = true
+  try {
+    await saveConfigs(settings.value)
+    // 更新全局配置
+    configStore.updateConfig(settings.value)
+    message.success('设置已保存')
+  } catch (error: any) {
+    message.error(error.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+// 重置配置
+function handleReset() {
+  if (confirm('确定要重置所有设置吗？')) {
+    loadSettings()
+  }
+}
+
+onMounted(() => {
+  loadSettings()
+})
 </script>
 
 <style scoped>
@@ -199,6 +225,31 @@ function handleReset() {
   overflow: hidden;
 }
 
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--spacing-md);
+  color: var(--color-gray-500);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .settings-nav {
   display: flex;
   gap: var(--spacing-xs);
@@ -207,19 +258,6 @@ function handleReset() {
   border-bottom: 1px solid var(--color-gray-200);
   overflow-x: auto;
   flex-shrink: 0;
-}
-
-.settings-nav::-webkit-scrollbar {
-  height: 4px;
-}
-
-.settings-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.settings-nav::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
-  border-radius: 2px;
 }
 
 .nav-btn {
@@ -254,23 +292,6 @@ function handleReset() {
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-2xl) 2%;
-}
-
-.settings-section::-webkit-scrollbar {
-  width: 6px;
-}
-
-.settings-section::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.settings-section::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
-  border-radius: 3px;
-}
-
-.settings-section::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray-400);
 }
 
 .section-title {
@@ -345,34 +366,6 @@ function handleReset() {
   margin-top: 4px;
 }
 
-.form-checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--color-gray-50);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.form-checkbox:hover {
-  background: var(--color-gray-100);
-}
-
-.form-checkbox input[type='checkbox'] {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: var(--color-miku-500);
-}
-
-.form-checkbox span {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-gray-700);
-}
-
 .settings-actions {
   display: flex;
   justify-content: flex-end;
@@ -400,7 +393,7 @@ function handleReset() {
   border: 2px solid var(--color-gray-300);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background: var(--color-gray-50);
   border-color: var(--color-gray-400);
 }
@@ -411,12 +404,14 @@ function handleReset() {
   box-shadow: 0 2px 8px rgba(57, 197, 187, 0.2);
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(57, 197, 187, 0.3);
 }
 
-.btn-primary:active {
-  transform: translateY(0);
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

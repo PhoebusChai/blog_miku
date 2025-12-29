@@ -97,6 +97,7 @@
               @reply="handleReplyComment"
               @markSpam="handleMarkSpam"
               @delete="handleDeleteComment"
+              @stats-update="handleCommentStatsUpdate"
             />
           </div>
 
@@ -451,26 +452,28 @@ function handleArticleStatsUpdate(articleStats: { total: number; published: numb
 
 // 评论操作
 function handleApproveComment(id: number) {
-  alert(`评论 ID: ${id} 已通过审核`)
-  stats.value.pendingComments = Math.max(0, stats.value.pendingComments - 1)
+  // 由 CommentManagement 组件内部处理
 }
 
 function handleUnapproveComment(id: number) {
-  alert(`评论 ID: ${id} 已取消通过`)
-  stats.value.pendingComments++
+  // 由 CommentManagement 组件内部处理
 }
 
 function handleReplyComment(id: number) {
-  alert(`回复评论 ID: ${id}`)
+  // 由 CommentManagement 组件内部处理
 }
 
 function handleMarkSpam(id: number) {
-  alert(`评论 ID: ${id} 已标记为垃圾评论`)
+  // 由 CommentManagement 组件内部处理
 }
 
 function handleDeleteComment(id: number) {
-  alert(`评论 ID: ${id} 已删除`)
-  stats.value.comments--
+  // 由 CommentManagement 组件内部处理
+}
+
+function handleCommentStatsUpdate(commentStats: { total: number; approved: number; pending: number; spam: number }) {
+  stats.value.comments = commentStats.total
+  stats.value.pendingComments = commentStats.pending
 }
 
 // 处理操作

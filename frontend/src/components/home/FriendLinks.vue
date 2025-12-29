@@ -2,8 +2,13 @@
   <div class="friend-links">
     <h3 class="friend-links__title">友情链接</h3>
     
+    <!-- 加载状态 -->
+    <div v-if="loading" class="links-loading">
+      <div class="loading-spinner-small"></div>
+    </div>
+
     <!-- 空状态 -->
-    <div v-if="links.length === 0" class="links-empty">
+    <div v-else-if="links.length === 0" class="links-empty">
       <div class="links-empty-icon">
         <Link2 :size="28" />
       </div>
@@ -14,10 +19,12 @@
     <div v-else class="friend-links__list">
       <a
         v-for="link in links"
-        :key="link.name"
+        :key="link.id"
         :href="link.url"
         target="_blank"
+        rel="noopener noreferrer"
         class="friend-link"
+        :title="link.description"
       >
         <span class="friend-link__dot"></span>
         <span class="friend-link__text">{{ link.name }}</span>
@@ -38,28 +45,60 @@
 <script setup lang="ts">
 /**
  * 友情链接组件
- * @description 展示友情链接列表
+ * @description 展示友情链接列表，从API获取数据
  */
+import { ref, onMounted } from 'vue'
 import { Link2 } from 'lucide-vue-next'
+import { getApprovedLinks, type FriendLink } from '@/api/link'
 
-interface FriendLink {
-  name: string
-  url: string
+const links = ref<FriendLink[]>([])
+const loading = ref(false)
+
+// 加载友链数据
+async function loadLinks() {
+  loading.value = true
+  try {
+    const data = await getApprovedLinks()
+    links.value = data
+  } catch (error) {
+    console.error('加载友链失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
-interface Props {
-  /** 链接列表 */
-  links?: FriendLink[]
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  links: () => []
+onMounted(() => {
+  loadLinks()
 })
 </script>
 
 <style scoped>
 .friend-links {
   padding: var(--spacing-lg) 0;
+}
+
+/* 加载状态 */
+.links-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  min-height: 80px;
+}
+
+.loading-spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-gray-200);
+  border-top-color: var(--color-miku-400);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .friend-links__title {

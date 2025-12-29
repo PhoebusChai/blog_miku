@@ -7,23 +7,23 @@
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'all' }"
-            @click="activeTab = 'all'"
+            @click="switchTab('all')"
           >
-            全部 ({{ projects.length }})
+            全部 ({{ stats.total }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'active' }"
-            @click="activeTab = 'active'"
+            @click="switchTab('active')"
           >
-            进行中
+            进行中 ({{ stats.active }})
           </button>
           <button
             class="tab-btn"
             :class="{ active: activeTab === 'completed' }"
-            @click="activeTab = 'completed'"
+            @click="switchTab('completed')"
           >
-            已完成
+            已完成 ({{ stats.completed }})
           </button>
         </div>
       </div>
@@ -48,8 +48,14 @@
       </div>
     </div>
 
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <Loader2 :size="32" class="loading-icon" />
+      <p>加载中...</p>
+    </div>
+
     <!-- 项目列表 -->
-    <div class="project-list-wrapper">
+    <div v-else class="project-list-wrapper">
       <table class="project-table">
         <thead>
           <tr>
@@ -62,7 +68,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="project in paginatedProjects" :key="project.id" class="project-row">
+          <tr v-for="project in filteredProjects" :key="project.id" class="project-row">
             <td class="col-name">
               <div class="name-cell">
                 <div class="project-name">{{ project.title }}</div>
@@ -71,7 +77,7 @@
             </td>
             <td class="col-tech">
               <div class="tech-tags">
-                <span v-for="tech in project.tech" :key="tech" class="tech-tag">
+                <span v-for="tech in parseTechStack(project.techStack)" :key="tech" class="tech-tag">
                   {{ tech }}
                 </span>
               </div>
@@ -82,24 +88,19 @@
               </span>
             </td>
             <td class="col-link">
-              <a
-                v-if="project.demoUrl"
-                :href="project.demoUrl"
-                target="_blank"
-                class="project-link"
-              >
+              <a v-if="project.demoUrl" :href="project.demoUrl" target="_blank" class="project-link">
                 <ExternalLink :size="14" />
                 访问
               </a>
               <span v-else class="no-link">-</span>
             </td>
-            <td class="col-date">{{ project.createdAt }}</td>
+            <td class="col-date">{{ formatDate(project.createdAt) }}</td>
             <td class="col-actions">
               <div class="actions-cell">
-                <button class="action-icon-btn" title="编辑" @click="handleEdit(project.id)">
+                <button type="button" class="action-icon-btn" title="编辑" @click.stop="handleEdit(project)">
                   <Edit :size="16" />
                 </button>
-                <button class="action-icon-btn" title="删除" @click="handleDelete(project.id)">
+                <button type="button" class="action-icon-btn action-icon-btn--delete" title="删除" @click.stop="handleDelete(project.id)">
                   <Trash2 :size="16" />
                 </button>
               </div>
@@ -119,33 +120,6 @@
       </div>
     </div>
 
-    <!-- 分页 -->
-    <div v-if="filteredProjects.length > 0" class="pagination">
-      <div class="pagination-info">共 {{ filteredProjects.length }} 条，每页 {{ pageSize }} 条</div>
-      <div class="pagination-controls">
-        <button class="pagination-btn" :disabled="currentPage === 1" @click="currentPage--">
-          <ChevronLeft :size="16" />
-        </button>
-        <button
-          v-for="page in displayPages"
-          :key="page"
-          class="pagination-btn"
-          :class="{ active: page === currentPage }"
-          :disabled="typeof page === 'string'"
-          @click="typeof page === 'number' && (currentPage = page)"
-        >
-          {{ page }}
-        </button>
-        <button
-          class="pagination-btn"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          <ChevronRight :size="16" />
-        </button>
-      </div>
-    </div>
-
     <!-- 项目表单弹窗 -->
     <ProjectFormModal
       :visible="showModal"
@@ -158,185 +132,156 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Briefcase,
-  ExternalLink,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Search, Plus, Edit, Trash2, Briefcase, ExternalLink, Loader2 } from 'lucide-vue-next'
 import ProjectFormModal from './ProjectFormModal.vue'
+import { getProjects, getProjectStats, createProject, updateProject, deleteProject } from '@/api/project'
+import { message } from '@/utils/message'
+import { ElMessageBox } from 'element-plus'
 
-// 状态
+const loading = ref(false)
 const activeTab = ref('all')
 const searchKeyword = ref('')
-const currentPage = ref(1)
-const pageSize = ref(10)
 const showModal = ref(false)
 const isEditMode = ref(false)
 const editingProject = ref<any>(null)
+const editingId = ref<number | null>(null)
 
-// Mock 数据
-const projects = ref([
-  {
-    id: 1,
-    title: '个人博客系统',
-    description: '基于 Vue 3 和 TypeScript 的现代化博客系统',
-    tech: ['Vue 3', 'TypeScript', 'Vite'],
-    status: 0, // 0-进行中，1-已完成，2-已归档
-    demoUrl: 'https://example.com',
-    githubUrl: 'https://github.com/example/blog',
-    createdAt: '2024-12-01'
-  },
-  {
-    id: 2,
-    title: 'Todo 应用',
-    description: '简洁高效的任务管理工具',
-    tech: ['React', 'Node.js'],
-    status: 1,
-    demoUrl: 'https://example.com/todo',
-    githubUrl: 'https://github.com/example/todo',
-    createdAt: '2024-11-15'
+const projects = ref<any[]>([])
+const stats = ref({ total: 0, active: 0, completed: 0, archived: 0 })
+
+// 加载项目列表
+async function loadProjects() {
+  loading.value = true
+  try {
+    const status = activeTab.value === 'active' ? 0 : activeTab.value === 'completed' ? 1 : undefined
+    projects.value = await getProjects(status)
+  } catch (error: any) {
+    message.error(error.message || '加载项目失败')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 加载统计
+async function loadStats() {
+  try {
+    stats.value = await getProjectStats()
+  } catch (error: any) {
+    console.error('加载统计失败:', error)
+  }
+}
+
+// 切换标签
+function switchTab(tab: string) {
+  activeTab.value = tab
+  loadProjects()
+}
 
 // 筛选项目
 const filteredProjects = computed(() => {
-  let result = projects.value
-
-  if (activeTab.value === 'active') {
-    result = result.filter((p) => p.status === 0)
-  } else if (activeTab.value === 'completed') {
-    result = result.filter((p) => p.status === 1)
-  }
-
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(
-      (p) =>
-        p.title.toLowerCase().includes(keyword) || p.description.toLowerCase().includes(keyword)
-    )
-  }
-
-  return result
+  if (!searchKeyword.value) return projects.value
+  const keyword = searchKeyword.value.toLowerCase()
+  return projects.value.filter(
+    (p) => p.title?.toLowerCase().includes(keyword) || p.description?.toLowerCase().includes(keyword)
+  )
 })
 
-// 分页
-const totalPages = computed(() => Math.ceil(filteredProjects.value.length / pageSize.value))
-
-const paginatedProjects = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredProjects.value.slice(start, end)
-})
-
-const displayPages = computed(() => {
-  const pages: (number | string)[] = []
-  const total = totalPages.value
-  const current = currentPage.value
-
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    if (current <= 4) {
-      for (let i = 1; i <= 5; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(total)
-    } else if (current >= total - 3) {
-      pages.push(1)
-      pages.push('...')
-      for (let i = total - 4; i <= total; i++) {
-        pages.push(i)
-      }
-    } else {
-      pages.push(1)
-      pages.push('...')
-      for (let i = current - 1; i <= current + 1; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(total)
-    }
+// 解析技术栈
+function parseTechStack(techStack: string | null): string[] {
+  if (!techStack) return []
+  try {
+    return JSON.parse(techStack)
+  } catch {
+    return techStack.split(',').map((s) => s.trim())
   }
+}
 
-  return pages
-})
-
-// 方法
 function getStatusText(status: number): string {
-  const statusMap: Record<number, string> = {
-    0: '进行中',
-    1: '已完成',
-    2: '已归档'
-  }
+  const statusMap: Record<number, string> = { 0: '进行中', 1: '已完成', 2: '已归档' }
   return statusMap[status] || '未知'
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
 function handleCreate() {
   isEditMode.value = false
   editingProject.value = null
+  editingId.value = null
   showModal.value = true
 }
 
-function handleEdit(id: number) {
-  const project = projects.value.find((p) => p.id === id)
-  if (project) {
-    isEditMode.value = true
-    editingProject.value = {
-      title: project.title,
-      description: project.description,
-      coverImage: '',
-      demoUrl: project.demoUrl,
-      githubUrl: project.githubUrl,
-      techStack: [...project.tech],
-      status: project.status
-    }
-    showModal.value = true
+function handleEdit(project: any) {
+  isEditMode.value = true
+  editingId.value = project.id
+  editingProject.value = {
+    title: project.title,
+    description: project.description,
+    coverImage: project.coverImage,
+    demoUrl: project.demoUrl,
+    githubUrl: project.githubUrl,
+    techStack: parseTechStack(project.techStack),
+    status: project.status
   }
+  showModal.value = true
 }
 
-function handleDelete(id: number) {
-  if (confirm('确定要删除这个项目吗？')) {
-    const index = projects.value.findIndex((p) => p.id === id)
-    if (index !== -1) {
-      projects.value.splice(index, 1)
-      console.log('删除项目:', id)
+async function handleDelete(id: number) {
+  try {
+    await ElMessageBox.confirm('确定要删除这个项目吗？', '删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await deleteProject(id)
+    message.success('项目已删除')
+    loadProjects()
+    loadStats()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      message.error(error.message || '删除失败')
     }
   }
 }
 
 function handleSearch() {
-  console.log('搜索关键词:', searchKeyword.value)
+  // 搜索通过 computed 自动处理
 }
 
-function handleModalSubmit(data: any) {
-  if (isEditMode.value) {
-    console.log('更新项目:', data)
-    // TODO: 调用API更新项目
-  } else {
-    const newProject = {
-      id: projects.value.length + 1,
+async function handleModalSubmit(data: any) {
+  try {
+    const projectData = {
       title: data.title,
       description: data.description,
-      tech: data.techStack,
-      status: data.status,
+      coverImage: data.coverImage,
       demoUrl: data.demoUrl,
       githubUrl: data.githubUrl,
-      createdAt: new Date().toISOString().split('T')[0]
+      techStack: JSON.stringify(data.techStack || []),
+      status: data.status
     }
-    projects.value.push(newProject)
-    console.log('创建项目:', newProject)
+
+    if (isEditMode.value && editingId.value) {
+      await updateProject(editingId.value, projectData)
+      message.success('项目已更新')
+    } else {
+      await createProject(projectData)
+      message.success('项目已创建')
+    }
+    showModal.value = false
+    loadProjects()
+    loadStats()
+  } catch (error: any) {
+    message.error(error.message || '操作失败')
   }
-  showModal.value = false
 }
+
+onMounted(() => {
+  loadProjects()
+  loadStats()
+})
 </script>
 
 <style scoped>
@@ -344,7 +289,7 @@ function handleModalSubmit(data: any) {
   display: flex;
   flex-direction: column;
   flex: 1;
-  width:100%;
+  width: 100%;
   min-height: 0;
 }
 
@@ -357,19 +302,9 @@ function handleModalSubmit(data: any) {
   border-bottom: 1px solid var(--color-gray-200);
 }
 
-.action-bar-left {
-  flex-shrink: 0;
-}
-
-.action-bar-center {
-  flex: 1;
-  display: flex;
-  gap: var(--spacing-md);
-}
-
-.action-bar-right {
-  flex-shrink: 0;
-}
+.action-bar-left { flex-shrink: 0; }
+.action-bar-center { flex: 1; display: flex; gap: var(--spacing-md); }
+.action-bar-right { flex-shrink: 0; }
 
 .tab-group {
   display: inline-flex;
@@ -392,14 +327,8 @@ function handleModalSubmit(data: any) {
   white-space: nowrap;
 }
 
-.tab-btn:hover {
-  color: var(--color-gray-900);
-}
-
-.tab-btn.active {
-  background: var(--color-miku-500);
-  color: var(--color-white);
-}
+.tab-btn:hover { color: var(--color-gray-900); }
+.tab-btn.active { background: var(--color-miku-500); color: var(--color-white); }
 
 .search-box {
   flex: 1;
@@ -410,7 +339,6 @@ function handleModalSubmit(data: any) {
   background: var(--color-gray-50);
   border: 1px solid var(--color-gray-200);
   border-radius: 6px;
-  transition: all var(--transition-fast);
 }
 
 .search-box:focus-within {
@@ -418,10 +346,7 @@ function handleModalSubmit(data: any) {
   box-shadow: 0 0 0 3px rgba(57, 197, 187, 0.1);
 }
 
-.search-box svg {
-  color: var(--color-gray-400);
-  flex-shrink: 0;
-}
+.search-box svg { color: var(--color-gray-400); flex-shrink: 0; }
 
 .search-input {
   flex: 1;
@@ -432,9 +357,7 @@ function handleModalSubmit(data: any) {
   background: transparent;
 }
 
-.search-input::placeholder {
-  color: var(--color-gray-400);
-}
+.search-input::placeholder { color: var(--color-gray-400); }
 
 .search-btn {
   padding: var(--spacing-xs) var(--spacing-md);
@@ -445,14 +368,9 @@ function handleModalSubmit(data: any) {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
-.search-btn:hover {
-  background: var(--color-miku-600);
-}
+.search-btn:hover { background: var(--color-miku-600); }
 
 .primary-btn {
   display: inline-flex;
@@ -466,13 +384,25 @@ function handleModalSubmit(data: any) {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
 .primary-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(57, 197, 187, 0.3);
 }
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl);
+  color: var(--color-gray-500);
+}
+
+.loading-icon { animation: spin 1s linear infinite; margin-bottom: var(--spacing-md); }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .project-list-wrapper {
   flex: 1;
@@ -482,28 +412,7 @@ function handleModalSubmit(data: any) {
   overflow-y: auto;
 }
 
-.project-list-wrapper::-webkit-scrollbar {
-  width: 6px;
-}
-
-.project-list-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.project-list-wrapper::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
-  border-radius: 3px;
-}
-
-.project-list-wrapper::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray-400);
-}
-
-.project-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-white);
-}
+.project-table { width: 100%; border-collapse: collapse; background: var(--color-white); }
 
 .project-table thead {
   position: sticky;
@@ -519,15 +428,6 @@ function handleModalSubmit(data: any) {
   font-weight: var(--font-semibold);
   color: var(--color-gray-700);
   border-bottom: 2px solid var(--color-gray-200);
-  white-space: nowrap;
-}
-
-.project-table th:first-child {
-  padding-left: var(--spacing-lg);
-}
-
-.project-table th:last-child {
-  padding-right: var(--spacing-lg);
 }
 
 .project-table td {
@@ -536,70 +436,20 @@ function handleModalSubmit(data: any) {
   vertical-align: middle;
 }
 
-.project-table td:first-child {
-  padding-left: var(--spacing-lg);
-}
+.project-row:hover { background: var(--color-gray-50); }
 
-.project-table td:last-child {
-  padding-right: var(--spacing-lg);
-}
+.col-name { width: 30%; }
+.col-tech { width: 25%; }
+.col-status { width: 10%; }
+.col-link { width: 10%; }
+.col-date { width: 12%; }
+.col-actions { width: 13%; }
 
-.project-row:hover {
-  background: var(--color-gray-50);
-}
+.name-cell { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.project-name { font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--color-gray-900); }
+.project-description { font-size: var(--text-sm); color: var(--color-gray-600); }
 
-.col-name {
-  width: 35%;
-}
-
-.col-tech {
-  width: 25%;
-}
-
-.col-status {
-  width: 10%;
-}
-
-.col-link {
-  width: 10%;
-}
-
-.col-date {
-  width: 12%;
-}
-
-.col-actions {
-  width: 8%;
-}
-
-.name-cell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.project-name {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  color: var(--color-gray-900);
-}
-
-.project-description {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.tech-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-}
-
+.tech-tags { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
 .tech-tag {
   display: inline-block;
   padding: 2px 8px;
@@ -615,23 +465,11 @@ function handleModalSubmit(data: any) {
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   border-radius: 12px;
-  white-space: nowrap;
 }
 
-.status-badge.status-0 {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.status-badge.status-1 {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.status-2 {
-  background: var(--color-gray-100);
-  color: var(--color-gray-700);
-}
+.status-badge.status-0 { background: #dbeafe; color: #1e40af; }
+.status-badge.status-1 { background: #d1fae5; color: #065f46; }
+.status-badge.status-2 { background: var(--color-gray-100); color: var(--color-gray-700); }
 
 .project-link {
   display: inline-flex;
@@ -640,28 +478,12 @@ function handleModalSubmit(data: any) {
   font-size: var(--text-sm);
   color: var(--color-miku-600);
   text-decoration: none;
-  transition: color var(--transition-fast);
 }
 
-.project-link:hover {
-  color: var(--color-miku-700);
-  text-decoration: underline;
-}
+.project-link:hover { color: var(--color-miku-700); text-decoration: underline; }
+.no-link { font-size: var(--text-sm); color: var(--color-gray-400); }
 
-.no-link {
-  font-size: var(--text-sm);
-  color: var(--color-gray-400);
-}
-
-.col-date {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-}
-
-.actions-cell {
-  display: flex;
-  gap: var(--spacing-xs);
-}
+.actions-cell { display: flex; gap: var(--spacing-xs); }
 
 .action-icon-btn {
   width: 32px;
@@ -674,13 +496,11 @@ function handleModalSubmit(data: any) {
   border-radius: 6px;
   color: var(--color-gray-600);
   cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
-.action-icon-btn:hover {
-  background: var(--color-miku-100);
-  color: var(--color-miku-600);
-}
+.action-icon-btn:hover { background: var(--color-miku-100); color: var(--color-miku-600); }
+.action-icon-btn--delete:hover { background: var(--color-red-100); color: var(--color-red-600); }
+.action-icon-btn svg { pointer-events: none; }
 
 .empty-state {
   display: flex;
@@ -692,65 +512,6 @@ function handleModalSubmit(data: any) {
   color: var(--color-gray-500);
 }
 
-.empty-icon {
-  margin-bottom: var(--spacing-lg);
-  opacity: 0.5;
-}
-
-.empty-state p {
-  margin: 0 0 var(--spacing-xl) 0;
-  font-size: var(--text-base);
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg) 2%;
-  background: var(--color-white);
-  border-top: 1px solid var(--color-gray-200);
-}
-
-.pagination-info {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-}
-
-.pagination-controls {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.pagination-btn {
-  min-width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--spacing-sm);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-gray-700);
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.pagination-btn:hover:not(:disabled):not(.active) {
-  border-color: var(--color-miku-500);
-  color: var(--color-miku-600);
-}
-
-.pagination-btn.active {
-  background: var(--color-miku-500);
-  border-color: var(--color-miku-500);
-  color: var(--color-white);
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.empty-icon { margin-bottom: var(--spacing-lg); opacity: 0.5; }
+.empty-state p { margin: 0 0 var(--spacing-xl) 0; font-size: var(--text-base); }
 </style>

@@ -72,17 +72,40 @@ public class CommentService {
     }
     
     /**
-     * 删除评论
+     * 删除评论（包括子评论）
      */
     @Transactional
     public void removeById(Integer id) {
         Comment comment = getById(id);
         if (comment != null) {
+            // 先删除所有子评论
+            deleteChildComments(id);
+            
+            // 删除当前评论
             commentMapper.deleteById(id);
             
             // 如果是文章评论，更新文章的评论数
             if (comment.getArticleId() != null) {
                 articleMapper.decrementCommentCount(comment.getArticleId());
+            }
+        }
+    }
+    
+    /**
+     * 递归删除子评论
+     */
+    private void deleteChildComments(Integer parentId) {
+        List<Comment> children = commentMapper.selectByParentId(parentId);
+        if (children != null && !children.isEmpty()) {
+            for (Comment child : children) {
+                // 递归删除子评论的子评论
+                deleteChildComments(child.getId());
+                // 删除子评论
+                commentMapper.deleteById(child.getId());
+                // 更新文章评论数
+                if (child.getArticleId() != null) {
+                    articleMapper.decrementCommentCount(child.getArticleId());
+                }
             }
         }
     }

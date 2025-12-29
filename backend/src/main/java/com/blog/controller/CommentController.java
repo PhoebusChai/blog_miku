@@ -160,6 +160,16 @@ public class CommentController {
     }
     
     /**
+     * 恢复评论（从垃圾评论恢复为待审核）
+     */
+    @PutMapping("/{id}/restore")
+    public Result<Void> restoreComment(@PathVariable Integer id) {
+        StpUtil.checkRole("admin");
+        commentService.updateStatus(id, 0);
+        return Result.success();
+    }
+    
+    /**
      * 批量删除评论
      */
     @DeleteMapping("/batch")

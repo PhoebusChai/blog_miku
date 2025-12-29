@@ -36,6 +36,12 @@ public interface CommentMapper {
     int deleteById(Integer id);
     
     /**
+     * 根据父评论ID查询子评论
+     */
+    @Select("SELECT * FROM comments WHERE parent_id = #{parentId}")
+    List<Comment> selectByParentId(Integer parentId);
+    
+    /**
      * 获取文章评论列表（包含用户信息）
      * 使用 DATE_FORMAT 确保日期格式正确
      */
