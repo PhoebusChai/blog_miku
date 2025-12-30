@@ -13,6 +13,102 @@ export interface User {
   lastLoginAt?: string
 }
 
+export interface ReadingHistory {
+  id: number
+  userId: number
+  articleId: number
+  isLiked: number
+  isBookmarked: number
+  createdAt: string
+  updatedAt: string
+  articleTitle?: string
+  articleSummary?: string
+  articleCover?: string
+}
+
+export interface UserActivity {
+  commentCount: number
+  likeCount: number
+  bookmarkCount: number
+}
+
+// ========== 个人中心 API ==========
+
+/**
+ * 获取当前用户信息
+ */
+export function getCurrentUser() {
+  return request<User>({
+    url: '/users/me',
+    method: 'get'
+  })
+}
+
+/**
+ * 更新当前用户信息
+ */
+export function updateProfile(data: { name?: string; avatar?: string }) {
+  return request<User>({
+    url: '/users/me',
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 修改密码
+ */
+export function changePassword(data: { oldPassword: string; newPassword: string }) {
+  return request<void>({
+    url: '/users/me/password',
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 获取用户活动统计
+ */
+export function getUserActivity() {
+  return request<UserActivity>({
+    url: '/users/me/activity',
+    method: 'get'
+  })
+}
+
+/**
+ * 获取阅读记录
+ */
+export function getReadingHistory(limit = 20) {
+  return request<ReadingHistory[]>({
+    url: '/users/me/reading-history',
+    method: 'get',
+    params: { limit }
+  })
+}
+
+/**
+ * 获取点赞的文章
+ */
+export function getLikedArticles() {
+  return request<ReadingHistory[]>({
+    url: '/users/me/likes',
+    method: 'get'
+  })
+}
+
+/**
+ * 获取收藏的文章
+ */
+export function getBookmarkedArticles() {
+  return request<ReadingHistory[]>({
+    url: '/users/me/bookmarks',
+    method: 'get'
+  })
+}
+
+// ========== 管理员 API ==========
+
 /**
  * 获取所有用户（管理员）
  */

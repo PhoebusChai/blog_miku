@@ -55,8 +55,21 @@
         <h2 class="section-title">博主信息</h2>
         <div class="settings-form">
           <div class="form-group">
-            <label class="form-label">头像 URL</label>
-            <input v-model="settings.blogger_avatar" type="text" class="form-input" />
+            <label class="form-label">头像</label>
+            <div class="avatar-upload-area">
+              <div class="avatar-preview-box">
+                <img :src="settings.blogger_avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="博主头像" />
+              </div>
+              <div class="avatar-actions">
+                <input ref="avatarInputRef" type="file" accept="image/*" class="file-input-hidden" @change="handleAvatarUpload" />
+                <button class="upload-btn" @click="triggerAvatarUpload" :disabled="uploadingAvatar">
+                  <Upload :size="16" />
+                  {{ uploadingAvatar ? '上传中...' : '上传图片' }}
+                </button>
+                <span class="upload-or">或</span>
+                <input v-model="settings.blogger_avatar" type="text" class="form-input url-input" placeholder="输入图片URL" />
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">昵称</label>
@@ -131,8 +144,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Globe, Share2, User } from 'lucide-vue-next'
+import { Globe, Share2, User, Upload } from 'lucide-vue-next'
 import { getAllConfig, saveConfigs, type SiteConfig } from '@/api/config'
+import { uploadFile } from '@/api/upload'
 import { useConfigStore } from '@/stores/config'
 import { message } from '@/utils/message'
 
@@ -140,6 +154,8 @@ const configStore = useConfigStore()
 const activeTab = ref('basic')
 const loading = ref(true)
 const saving = ref(false)
+const uploadingAvatar = ref(false)
+const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 const tabs = [
   { id: 'basic', label: '基本设置', icon: Globe },
@@ -170,6 +186,40 @@ const settings = ref<SiteConfig>({
   social_weibo: '',
   social_zhihu: ''
 })
+
+// 触发头像上传
+function triggerAvatarUpload() {
+  avatarInputRef.value?.click()
+}
+
+// 处理头像上传
+async function handleAvatarUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    message.warning('请选择图片文件')
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    message.warning('图片大小不能超过 5MB')
+    return
+  }
+
+  uploadingAvatar.value = true
+  try {
+    const result = await uploadFile(file)
+    settings.value.blogger_avatar = result.url
+    message.success('头像上传成功')
+  } catch (error: any) {
+    message.error(error.message || '上传失败')
+  } finally {
+    uploadingAvatar.value = false
+    input.value = ''
+  }
+}
 
 // 加载配置
 async function loadSettings() {
@@ -364,6 +414,78 @@ onMounted(() => {
   font-size: var(--text-xs);
   color: var(--color-gray-500);
   margin-top: 4px;
+}
+
+/* 头像上传区域 */
+.avatar-upload-area {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xl);
+}
+
+.avatar-preview-box {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-gray-100);
+  border: 3px solid var(--color-gray-200);
+  flex-shrink: 0;
+}
+
+.avatar-preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.file-input-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-miku-600);
+  background: var(--color-miku-50);
+  border: 1px solid var(--color-miku-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: fit-content;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background: var(--color-miku-100);
+  border-color: var(--color-miku-300);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload-or {
+  font-size: var(--text-xs);
+  color: var(--color-gray-400);
+}
+
+.url-input {
+  max-width: 400px;
 }
 
 .settings-actions {

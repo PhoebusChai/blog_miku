@@ -20,6 +20,15 @@ public interface ArticleMapper {
     @Select("SELECT COUNT(*) FROM articles WHERE status = 1")
     Long countPublished();
     
+    @Select("SELECT COALESCE(SUM(view_count), 0) FROM articles WHERE status = 1")
+    Long sumViewCount();
+    
+    @Select("SELECT COALESCE(SUM(like_count), 0) FROM articles WHERE status = 1")
+    Long sumLikeCount();
+    
+    @Select("SELECT COALESCE(SUM(comment_count), 0) FROM articles WHERE status = 1")
+    Long sumCommentCount();
+    
     @Select("SELECT * FROM articles WHERE author_id = #{authorId} " +
             "ORDER BY created_at DESC LIMIT #{offset}, #{limit}")
     List<Article> selectByAuthor(@Param("authorId") Integer authorId,

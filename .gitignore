@@ -61,3 +61,11 @@ ENV/
 # Backup files
 *.bak
 *.backup
+
+# Docker data volumes
+docker/mysql/data/
+docker/redis/data/
+docker/nginx/logs/
+docker/nginx/html/
+docker/backend/logs/
+docker/uploads/

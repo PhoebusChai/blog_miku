@@ -55,3 +55,6 @@ export const message = {
 }
 
 export default message
+
+// 别名导出，兼容不同的导入方式
+export const showMessage = message

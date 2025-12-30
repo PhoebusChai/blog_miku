@@ -142,6 +142,15 @@ public class ArticleController {
         return Result.success(articleService.getPublishHeatmap());
     }
     
+    /**
+     * 获取网站公开统计数据
+     * 包括文章数、总浏览量、总点赞数、总评论数
+     */
+    @GetMapping("/stats/public")
+    public Result<Map<String, Object>> getPublicStats() {
+        return Result.success(articleService.getPublicStats());
+    }
+    
     @GetMapping("/ranking")
     public Result<List<ArticleRankingDTO>> getRanking(
             @RequestParam(defaultValue = "10") Integer limit) {

@@ -179,6 +179,18 @@ public class ArticleService {
         return result;
     }
     
+    /**
+     * 获取网站公开统计数据
+     */
+    public Map<String, Object> getPublicStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("articles", articleMapper.countPublished());
+        stats.put("views", articleMapper.sumViewCount());
+        stats.put("likes", articleMapper.sumLikeCount());
+        stats.put("comments", articleMapper.sumCommentCount());
+        return stats;
+    }
+    
     public List<ArticleRankingDTO> getTopArticles(Integer limit) {
         List<Map<String, Object>> data = articleMapper.selectTopByViews(limit);
         List<ArticleRankingDTO> result = new ArrayList<>();

@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 public class ReadingHistoryService {
     
@@ -33,6 +35,27 @@ public class ReadingHistoryService {
             return null;
         }
         return readingHistoryMapper.selectByUserAndArticle(userId, articleId);
+    }
+    
+    /**
+     * 获取用户阅读记录列表
+     */
+    public List<ReadingHistory> getReadingHistory(Integer userId, Integer limit) {
+        return readingHistoryMapper.selectByUserId(userId, limit);
+    }
+    
+    /**
+     * 获取用户点赞的文章
+     */
+    public List<ReadingHistory> getLikedArticles(Integer userId) {
+        return readingHistoryMapper.selectLikedByUserId(userId);
+    }
+    
+    /**
+     * 获取用户收藏的文章
+     */
+    public List<ReadingHistory> getBookmarkedArticles(Integer userId) {
+        return readingHistoryMapper.selectBookmarkedByUserId(userId);
     }
     
     /**

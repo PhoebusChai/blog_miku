@@ -54,8 +54,9 @@
  * 关于我组件
  * @description 展示个人信息、技能、社交链接和统计数据
  */
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { getPublicStats } from '@/api/article'
 
 const configStore = useConfigStore()
 
@@ -75,12 +76,40 @@ const socialLinks = computed(() => {
   return links
 })
 
-// 统计数据（这些可以从其他API获取，暂时使用占位）
-const stats = [
+// 格式化数字
+function formatNumber(num: number): string {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'W'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
+}
+
+// 统计数据
+const stats = ref([
   { label: '文章', value: '--' },
   { label: '访问', value: '--' },
   { label: '评论', value: '--' }
-]
+])
+
+// 加载统计数据
+async function loadStats() {
+  try {
+    const data = await getPublicStats()
+    stats.value = [
+      { label: '文章', value: formatNumber(data.articles) },
+      { label: '访问', value: formatNumber(data.views) },
+      { label: '评论', value: formatNumber(data.comments) }
+    ]
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadStats()
+})
 </script>
 
 <style scoped>

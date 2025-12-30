@@ -54,6 +54,11 @@ export const useUserStore = defineStore('user', () => {
     return user.value?.role === 1
   }
 
+  // 设置用户信息
+  const setUser = (newUser: UserInfo) => {
+    user.value = newUser
+  }
+
   return {
     user,
     token,
@@ -61,6 +66,7 @@ export const useUserStore = defineStore('user', () => {
     loginUser,
     logoutUser,
     initUser,
-    isAdmin
+    isAdmin,
+    setUser
   }
 })

@@ -12,4 +12,9 @@ public class ReadingHistory {
     private Integer isBookmarked; // 0-否，1-是
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    // 关联字段（非数据库字段）
+    private String articleTitle;
+    private String articleSummary;
+    private String articleCover;
 }

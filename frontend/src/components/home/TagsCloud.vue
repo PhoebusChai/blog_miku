@@ -55,13 +55,18 @@ function handleTagClick(tag: string) {
 <style scoped>
 .tags-cloud {
   padding: var(--spacing-lg) 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tags-cloud__title {
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
-  margin-bottom: var(--spacing-md);
+  margin: 0 0 var(--spacing-lg) 0;
   color: var(--color-gray-900);
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 /* 空状态 */
@@ -103,7 +108,7 @@ function handleTagClick(tag: string) {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
+  width: 100%;
 }
 
 .tag-item {

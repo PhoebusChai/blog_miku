@@ -3,7 +3,9 @@ package com.blog.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.blog.common.Result;
 import com.blog.entity.User;
+import com.blog.entity.ReadingHistory;
 import com.blog.service.UserService;
+import com.blog.service.ReadingHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +18,90 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private ReadingHistoryService readingHistoryService;
+
+    // ========== 个人中心 API ==========
+
+    /**
+     * 获取当前用户信息
+     */
+    @GetMapping("/me")
+    public Result<User> getCurrentUser() {
+        StpUtil.checkLogin();
+        User user = userService.getCurrentUser();
+        return Result.success(user);
+    }
+
+    /**
+     * 更新当前用户信息
+     */
+    @PutMapping("/me")
+    public Result<User> updateCurrentUser(@RequestBody Map<String, String> data) {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        User user = userService.updateProfile(userId, data.get("name"), data.get("avatar"));
+        return Result.success(user);
+    }
+
+    /**
+     * 修改密码
+     */
+    @PutMapping("/me/password")
+    public Result<Void> changePassword(@RequestBody Map<String, String> data) {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        userService.changePassword(userId, data.get("oldPassword"), data.get("newPassword"));
+        return Result.success();
+    }
+
+    /**
+     * 获取用户活动统计
+     */
+    @GetMapping("/me/activity")
+    public Result<Map<String, Object>> getMyActivity() {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        Map<String, Object> activity = userService.getUserActivity(userId);
+        return Result.success(activity);
+    }
+
+    /**
+     * 获取阅读记录
+     */
+    @GetMapping("/me/reading-history")
+    public Result<List<ReadingHistory>> getReadingHistory(
+            @RequestParam(defaultValue = "20") Integer limit) {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        List<ReadingHistory> history = readingHistoryService.getReadingHistory(userId, limit);
+        return Result.success(history);
+    }
+
+    /**
+     * 获取点赞的文章
+     */
+    @GetMapping("/me/likes")
+    public Result<List<ReadingHistory>> getLikedArticles() {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        List<ReadingHistory> likes = readingHistoryService.getLikedArticles(userId);
+        return Result.success(likes);
+    }
+
+    /**
+     * 获取收藏的文章
+     */
+    @GetMapping("/me/bookmarks")
+    public Result<List<ReadingHistory>> getBookmarkedArticles() {
+        StpUtil.checkLogin();
+        int userId = StpUtil.getLoginIdAsInt();
+        List<ReadingHistory> bookmarks = readingHistoryService.getBookmarkedArticles(userId);
+        return Result.success(bookmarks);
+    }
+
+    // ========== 管理员 API ==========
 
     /**
      * 获取所有用户（管理员）

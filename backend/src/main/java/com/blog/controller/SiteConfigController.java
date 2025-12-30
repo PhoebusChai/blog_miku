@@ -1,15 +1,15 @@
 package com.blog.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.blog.common.Result;
 import com.blog.service.SiteConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/config")
+@RequestMapping("/config")
 public class SiteConfigController {
     
     @Autowired
@@ -19,9 +19,9 @@ public class SiteConfigController {
      * 获取所有公开配置（无需登录）
      */
     @GetMapping("/public")
-    public ResponseEntity<Map<String, Object>> getPublicConfigs() {
+    public Result<Map<String, Object>> getPublicConfigs() {
         Map<String, Object> configs = siteConfigService.getAllConfigs();
-        return ResponseEntity.ok(configs);
+        return Result.success(configs);
     }
     
     /**
@@ -29,18 +29,18 @@ public class SiteConfigController {
      */
     @GetMapping
     @SaCheckRole("admin")
-    public ResponseEntity<Map<String, Object>> getAllConfigs() {
+    public Result<Map<String, Object>> getAllConfigs() {
         Map<String, Object> configs = siteConfigService.getAllConfigs();
-        return ResponseEntity.ok(configs);
+        return Result.success(configs);
     }
     
     /**
      * 获取单个配置
      */
     @GetMapping("/{key}")
-    public ResponseEntity<Object> getConfig(@PathVariable String key) {
+    public Result<Object> getConfig(@PathVariable String key) {
         Object value = siteConfigService.getConfig(key);
-        return ResponseEntity.ok(value);
+        return Result.success(value);
     }
     
     /**
@@ -48,9 +48,9 @@ public class SiteConfigController {
      */
     @PostMapping
     @SaCheckRole("admin")
-    public ResponseEntity<Void> saveConfigs(@RequestBody Map<String, Object> configs) {
+    public Result<Void> saveConfigs(@RequestBody Map<String, Object> configs) {
         siteConfigService.saveConfigs(configs);
-        return ResponseEntity.ok().build();
+        return Result.success();
     }
     
     /**
@@ -58,9 +58,9 @@ public class SiteConfigController {
      */
     @PutMapping("/{key}")
     @SaCheckRole("admin")
-    public ResponseEntity<Void> saveConfig(@PathVariable String key, @RequestBody Object value) {
+    public Result<Void> saveConfig(@PathVariable String key, @RequestBody Object value) {
         siteConfigService.saveConfig(key, value);
-        return ResponseEntity.ok().build();
+        return Result.success();
     }
     
     /**
@@ -68,8 +68,8 @@ public class SiteConfigController {
      */
     @DeleteMapping("/{key}")
     @SaCheckRole("admin")
-    public ResponseEntity<Void> deleteConfig(@PathVariable String key) {
+    public Result<Void> deleteConfig(@PathVariable String key) {
         siteConfigService.deleteConfig(key);
-        return ResponseEntity.ok().build();
+        return Result.success();
     }
 }

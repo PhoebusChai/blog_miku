@@ -15,90 +15,191 @@
 - 📱 响应式设计，支持移动端
 - 🌙 深色模式支持
 - ⚡ 快速加载，性能优化
+- 🖼️ 图片上传与管理
+- 🔗 友情链接管理
+- 📊 项目展示
+- 📧 邮件通知
 
 ## 技术栈
 
 ### 前端
 - Vue 3 - 渐进式 JavaScript 框架
-- Lucide - 精美的图标库
+- TypeScript - 类型安全
+- Element Plus - UI 组件库
 - Vite - 下一代前端构建工具
-
-### 设计风格
-- 主题色：初音绿（葱绿色）+ 青色系
-- 设计语言：极简主义（Minimalism）
-- 视觉特点：线条划分、克制简约、层次清晰
+- Lucide - 精美的图标库
 
 ### 后端
-- Spring Boot - Java 企业级应用框架
+- Spring Boot 3.2 - Java 企业级应用框架
 - MyBatis - 数据持久化框架
-- MySQL - 关系型数据库
+- Sa-Token - 权限认证框架
+- MySQL 8.0 - 关系型数据库
+- Redis - 缓存与会话存储
 
 ### 部署
-- 待定
+- Docker & Docker Compose
+- Nginx - 反向代理与静态资源服务
 
 ## 快速开始
 
-### 前端启动
+### 环境要求
+
+- Node.js 18+
+- Java 17+
+- Docker & Docker Compose
+- MySQL 8.0（本地开发）
+- Redis（本地开发）
+
+### 本地开发
+
+#### 前端
 
 ```bash
-# 进入前端目录
 cd frontend
-
-# 安装依赖
 npm install
-
-# 启动开发服务器
 npm run dev
 ```
 
-### 后端启动
+#### 后端
 
 ```bash
-# 进入后端目录
 cd backend
-
-# 使用 Maven 启动
-./mvnw spring-boot:run
-
-# 或使用 Gradle 启动
-./gradlew bootRun
+mvn spring-boot:run
 ```
+
+### Docker 部署
+
+#### 1. 配置环境变量
+
+```bash
+# 复制环境变量示例文件
+cp .env.example .env
+
+# 编辑配置
+# - MYSQL_ROOT_PASSWORD: MySQL 密码
+# - MAIL_USERNAME: 邮箱账号
+# - MAIL_PASSWORD: 邮箱 SMTP 密码
+# - JWT_SECRET: JWT 密钥
+```
+
+#### 2. 一键部署
+
+**Windows:**
+```batch
+deploy.bat build
+```
+
+**Linux/Mac:**
+```bash
+chmod +x deploy.sh
+./deploy.sh build
+```
+
+#### 3. 访问服务
+
+- 前端: http://localhost
+- 后端 API: http://localhost/api
+
+#### 4. 配置 HTTPS（生产环境）
+
+使用 Let's Encrypt 免费 SSL 证书：
+
+```bash
+# Linux/Mac
+chmod +x scripts/init-ssl.sh
+./scripts/init-ssl.sh your-domain.com your-email@example.com
+
+# 手动续订证书
+./scripts/renew-ssl.sh your-domain.com
+```
+
+证书会自动每 12 小时检查续订。
+
+### 部署命令
+
+| 命令 | 说明 |
+|------|------|
+| `deploy.bat init` | 初始化环境 |
+| `deploy.bat start` | 启动服务 |
+| `deploy.bat stop` | 停止服务 |
+| `deploy.bat restart` | 重启服务 |
+| `deploy.bat logs` | 查看日志 |
+| `deploy.bat build` | 构建并启动 |
+| `deploy.bat frontend` | 仅构建前端 |
 
 ## 项目结构
 
 ```
 personal-blog/
-├── frontend/         # 前端项目 (Vue 3)
-│   ├── src/         # 源代码
-│   ├── public/      # 静态资源
-│   └── package.json # 依赖配置
-├── backend/         # 后端项目 (Spring Boot)
-│   ├── src/         # 源代码
-│   │   ├── main/   # 主代码
-│   │   └── test/   # 测试代码
-│   └── pom.xml     # Maven 配置
-├── docs/            # 文档
-└── README.md        # 项目说明
+├── frontend/                # 前端项目 (Vue 3 + TypeScript)
+│   ├── src/
+│   │   ├── api/            # API 接口
+│   │   ├── components/     # 组件
+│   │   ├── views/          # 页面
+│   │   ├── stores/         # 状态管理
+│   │   └── utils/          # 工具函数
+│   └── Dockerfile
+├── backend/                 # 后端项目 (Spring Boot)
+│   ├── src/main/java/com/blog/
+│   │   ├── controller/     # 控制器
+│   │   ├── service/        # 服务层
+│   │   ├── mapper/         # 数据访问层
+│   │   ├── entity/         # 实体类
+│   │   └── config/         # 配置类
+│   └── Dockerfile
+├── database/                # 数据库脚本
+│   └── schema.sql          # 建表语句
+├── config/                  # 配置文件
+│   └── backend/
+│       └── application-prod.yml
+├── docker/                  # Docker 数据卷
+│   ├── mysql/              # MySQL 数据与配置
+│   ├── redis/              # Redis 数据与配置
+│   ├── nginx/              # Nginx 配置与前端文件
+│   ├── uploads/            # 上传文件
+│   └── backend/logs/       # 后端日志
+├── docker-compose.yml       # Docker 编排文件
+├── deploy.sh               # Linux 部署脚本
+├── deploy.bat              # Windows 部署脚本
+└── .env.example            # 环境变量示例
 ```
 
-## 开发计划
+## 服务端口
 
-- [ ] 搭建基础框架
-- [ ] 实现文章管理功能
-- [ ] 设计响应式界面
-- [ ] 添加评论系统
-- [ ] 部署上线
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| Nginx | 80 | 前端 + 反向代理 |
+| Backend | 8080 | 后端 API |
+| MySQL | 3306 | 数据库 |
+| Redis | 6379 | 缓存 |
 
-## 贡献指南
+## 数据持久化
 
-欢迎提交 Issue 和 Pull Request！
+所有数据挂载到 `docker/` 目录：
+
+- `docker/mysql/data/` - MySQL 数据
+- `docker/redis/data/` - Redis 数据
+- `docker/uploads/` - 上传文件
+- `docker/nginx/logs/` - Nginx 日志
+- `docker/backend/logs/` - 后端日志
+
+## 配置说明
+
+### 后端配置
+
+编辑 `config/backend/application-prod.yml`：
+
+- 数据库连接
+- Redis 配置
+- 邮件服务配置
+- JWT 密钥
+- 文件上传路径
+
+### Nginx 配置
+
+- 主配置: `docker/nginx/conf/nginx.conf`
+- 站点配置: `docker/nginx/conf.d/default.conf`
 
 ## 许可证
 
 MIT License
-
-## 联系方式
-
-- 邮箱：[your-email]
-- GitHub：[your-github]
-- 博客：[your-blog-url]

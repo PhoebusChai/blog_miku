@@ -1,31 +1,7 @@
 <template>
   <div class="home">
-    <!-- 加载进度条 -->
-    <div v-if="imageLoading" class="loading-overlay">
-      <div class="loading-container">
-        <!-- Icon Loading 动画 -->
-        <div class="loading-icon">
-          <Music :size="48" class="icon-spin" />
-        </div>
-        
-        <p class="loading-subtitle">{{ loadingText }}</p>
-        
-        <!-- 简约电池格子进度条 -->
-        <div class="battery-bar">
-          <div 
-            v-for="i in 10" 
-            :key="i" 
-            class="battery-cell"
-            :class="{ 'battery-cell--active': loadingProgress >= i * 10 }"
-          ></div>
-        </div>
-        
-        <p class="loading-text">{{ loadingProgress }}%</p>
-      </div>
-    </div>
-
     <!-- 全屏背景 Hero 区域 -->
-    <section class="hero-fullscreen" :class="{ 'hero-loaded': !imageLoading }">
+    <section class="hero-fullscreen">
       <AppHeader />
       <div class="hero-content">
         <h1 class="hero-title">欢迎来到落叶无痕的博客</h1>
@@ -230,7 +206,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { ArrowDown, ArrowUp, ArrowRight, Clock, Cloud, Calendar, Users, Music, FileText } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, ArrowRight, Clock, Cloud, Calendar, Users, FileText } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import FeaturedArticle from '@/components/article/FeaturedArticle.vue'
@@ -243,9 +219,12 @@ import RecentActivities from '@/components/home/RecentActivities.vue'
 import FriendLinks from '@/components/home/FriendLinks.vue'
 import ArticleRanking from '@/components/home/ArticleRanking.vue'
 import ArticleHeatmap from '@/components/home/ArticleHeatmap.vue'
-import { getArticleList, getAllTags, getArticleHeatmap, getArticleRanking, getFeaturedArticles } from '@/api/article'
+import { getArticleList, getAllTags, getArticleHeatmap, getArticleRanking, getFeaturedArticles, getPublicStats } from '@/api/article'
+import { useConfigStore } from '@/stores/config'
 import { message } from '@/utils/message'
 import type { Article } from '@/api/article'
+
+const configStore = useConfigStore()
 
 const articles = ref<Article[]>([])
 const featuredArticles = ref<Article[]>([])
@@ -261,25 +240,6 @@ const popularTags = ref<string[]>([])
 const heatmapData = ref<Record<string, number>>({})
 const rankingArticles = ref<Array<{ id: number; title: string; views: number }>>([])
 
-// 社交链接数据
-const socialLinks = ref([
-  {
-    name: 'GitHub',
-    url: 'https://github.com',
-    icon: 'github'
-  },
-  {
-    name: '哔哩哔哩',
-    url: 'https://space.bilibili.com',
-    icon: 'bilibili'
-  },
-  {
-    name: 'Email',
-    url: 'mailto:contact@example.com',
-    icon: 'mail'
-  }
-])
-
 // 侧边栏事件处理
 function handleTagClick(tag: string) {
   console.log('Tag clicked:', tag)
@@ -291,42 +251,45 @@ function handleActivityClick(activity: any) {
   // TODO: 实现活动跳转功能
 }
 
-// 图片加载状态
-const imageLoading = ref(true)
-const loadingProgress = ref(0)
-const loadingText = ref('初始化中...')
-
-// 加载文字列表 - 二次元搞怪风格
-const loadingMessages = [
-  '(๑•̀ㅂ•́)و✧ 系统启动中...',
-  '(｡･ω･｡) 召唤初音中...',
-  '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ 加载葱葱...',
-  '(๑˃ᴗ˂)ﻭ 准备唱歌...',
-  '(★ ω ★) 调试音符...',
-  '(ﾉ≧∀≦)ﾉ 马上好了...',
-  '(๑>ᴗ<๑) 完成啦！'
-]
-
 // 实时数据
 const currentTime = ref('')
 const currentDate = ref('')
-const weather = ref({ temp: '25', condition: '晴天', location: '北京' })
+const weather = ref({ temp: '--', condition: '获取中', location: '定位中' })
 const siteDays = ref(0)
-const stats = ref({ visits: '1,234', articles: '42', comments: '156' })
+const stats = ref({ visits: '0', articles: '0', comments: '0' })
 
-// 网站创建日期（请根据实际情况修改）
-const SITE_START_DATE = new Date('2024-01-01')
+// 格式化数字
+function formatNumber(num: number): string {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'W'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toLocaleString()
+}
 
 // 计算网站存在天数
 function calculateSiteDays() {
+  const startDateStr = configStore.siteStartDate || '2024-01-01'
+  const startDate = new Date(startDateStr)
+  
+  // 检查日期是否有效
+  if (isNaN(startDate.getTime())) {
+    // 如果日期无效，使用默认日期
+    const defaultDate = new Date('2024-01-01')
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - defaultDate.getTime())
+    siteDays.value = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return
+  }
+  
   const now = new Date()
-  const diffTime = Math.abs(now.getTime() - SITE_START_DATE.getTime())
+  const diffTime = Math.abs(now.getTime() - startDate.getTime())
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   siteDays.value = diffDays
 }
 
 let timeInterval: number | null = null
-let progressInterval: number | null = null
 
 function updateTime() {
   const now = new Date()
@@ -411,6 +374,105 @@ async function loadRanking() {
   }
 }
 
+// 加载统计数据
+async function loadStats() {
+  try {
+    const data = await getPublicStats()
+    stats.value = {
+      visits: formatNumber(data.views),
+      articles: data.articles.toString(),
+      comments: data.comments.toString()
+    }
+  } catch (error: any) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+// 获取天气数据（使用免费的天气API）
+async function loadWeather() {
+  try {
+    // 先获取用户位置
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords
+          // 使用 Open-Meteo 免费天气 API
+          const response = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&timezone=auto`
+          )
+          const data = await response.json()
+          if (data.current_weather) {
+            const weatherCode = data.current_weather.weathercode
+            weather.value = {
+              temp: Math.round(data.current_weather.temperature).toString(),
+              condition: getWeatherCondition(weatherCode),
+              location: '当前位置'
+            }
+          }
+        },
+        () => {
+          // 定位失败，使用默认位置（北京）
+          loadDefaultWeather()
+        },
+        { timeout: 5000 }
+      )
+    } else {
+      loadDefaultWeather()
+    }
+  } catch (error) {
+    console.error('获取天气失败:', error)
+    loadDefaultWeather()
+  }
+}
+
+// 加载默认天气（北京）
+async function loadDefaultWeather() {
+  try {
+    const response = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=39.9042&longitude=116.4074&current_weather=true&timezone=auto'
+    )
+    const data = await response.json()
+    if (data.current_weather) {
+      const weatherCode = data.current_weather.weathercode
+      weather.value = {
+        temp: Math.round(data.current_weather.temperature).toString(),
+        condition: getWeatherCondition(weatherCode),
+        location: '北京'
+      }
+    }
+  } catch (error) {
+    weather.value = { temp: '--', condition: '未知', location: '北京' }
+  }
+}
+
+// 根据天气代码获取天气描述
+function getWeatherCondition(code: number): string {
+  const conditions: Record<number, string> = {
+    0: '晴天',
+    1: '晴朗',
+    2: '多云',
+    3: '阴天',
+    45: '雾',
+    48: '雾凇',
+    51: '小雨',
+    53: '中雨',
+    55: '大雨',
+    61: '小雨',
+    63: '中雨',
+    65: '大雨',
+    71: '小雪',
+    73: '中雪',
+    75: '大雪',
+    80: '阵雨',
+    81: '阵雨',
+    82: '暴雨',
+    95: '雷暴',
+    96: '雷暴冰雹',
+    99: '雷暴冰雹'
+  }
+  return conditions[code] || '未知'
+}
+
 // 监听滚动事件
 function handleScroll() {
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop
@@ -445,30 +507,11 @@ onMounted(async () => {
     calculateSiteDays()
   }, 1000)
   
-  // 模拟图片加载进度（开发环境固定3秒）
-  const loadDuration = 3000 // 3秒
-  const updateInterval = 30 // 每30ms更新一次
-  const totalSteps = loadDuration / updateInterval
-  let currentStep = 0
+  // 加载天气数据
+  loadWeather()
   
-  progressInterval = window.setInterval(() => {
-    currentStep++
-    loadingProgress.value = Math.min(Math.round((currentStep / totalSteps) * 100), 100)
-    
-    // 根据进度更新文字
-    const messageIndex = Math.floor((loadingProgress.value / 100) * (loadingMessages.length - 1))
-    loadingText.value = loadingMessages[messageIndex]
-    
-    if (currentStep >= totalSteps) {
-      if (progressInterval) {
-        clearInterval(progressInterval)
-      }
-      // 确保进度条到100%后再隐藏
-      setTimeout(() => {
-        imageLoading.value = false
-      }, 200)
-    }
-  }, updateInterval)
+  // 加载统计数据
+  loadStats()
   
   // 加载真实数据
   try {
@@ -510,9 +553,6 @@ onUnmounted(() => {
   if (timeInterval) {
     clearInterval(timeInterval)
   }
-  if (progressInterval) {
-    clearInterval(progressInterval)
-  }
   // 移除滚动监听
   window.removeEventListener('scroll', handleScroll)
 })
@@ -522,147 +562,6 @@ onUnmounted(() => {
 .home {
   min-height: 100vh;
   overflow-x: hidden;
-}
-
-/* 加载进度条 - 初音未来风格 */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e6f9f7 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-xl);
-  animation: fadeInScale 0.6s ease-out;
-}
-
-/* Icon Loading 动画 */
-.loading-icon {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--color-miku-400), var(--color-cyan-400));
-  border-radius: 50%;
-  box-shadow: 0 8px 24px rgba(57, 197, 187, 0.3);
-  animation: iconPulse 2s ease-in-out infinite;
-}
-
-.icon-spin {
-  color: var(--color-white);
-  animation: spin 2s linear infinite;
-}
-
-@keyframes iconPulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 8px 24px rgba(57, 197, 187, 0.3);
-  }
-  50% {
-    transform: scale(1.1);
-    box-shadow: 0 12px 32px rgba(57, 197, 187, 0.5);
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-subtitle {
-  font-size: var(--text-lg);
-  color: var(--color-miku-500);
-  font-weight: var(--font-semibold);
-  letter-spacing: 0.5px;
-  text-align: center;
-  min-height: 28px;
-}
-
-/* 简约电池格子进度条 */
-.battery-bar {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-gray-300);
-}
-
-.battery-cell {
-  width: 20px;
-  height: 28px;
-  background: var(--color-gray-200);
-  border-radius: 2px;
-  transition: all 0.3s ease-out;
-}
-
-.battery-cell--active {
-  background: linear-gradient(180deg, var(--color-miku-400), var(--color-cyan-500));
-  box-shadow: 0 0 6px rgba(57, 197, 187, 0.4);
-}
-
-.loading-text {
-  font-size: var(--text-base);
-  color: var(--color-gray-600);
-  font-weight: var(--font-medium);
-  letter-spacing: 1px;
-  font-family: 'Courier New', monospace;
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (max-width: 640px) {
-  .loading-icon {
-    width: 64px;
-    height: 64px;
-  }
-  
-  .loading-icon svg {
-    width: 36px;
-    height: 36px;
-  }
-  
-  .loading-subtitle {
-    font-size: var(--text-base);
-  }
-  
-  .battery-bar {
-    gap: 3px;
-    padding: 3px;
-  }
-  
-  .battery-cell {
-    width: 16px;
-    height: 24px;
-  }
-  
-  .loading-text {
-    font-size: var(--text-sm);
-  }
 }
 
 /* 全屏 Hero 区域 */
@@ -676,12 +575,6 @@ onUnmounted(() => {
   background-position: center;
   background-repeat: no-repeat;
   overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.5s ease-in;
-}
-
-.hero-fullscreen.hero-loaded {
-  opacity: 1;
 }
 
 .hero-fullscreen::before {

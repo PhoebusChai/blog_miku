@@ -48,7 +48,6 @@
                     <img 
                       :src="photo.url" 
                       :alt="photo.title"
-                      :style="{ aspectRatio: photo.aspectRatio }"
                       @load="onImageLoad"
                     />
                   </div>
@@ -141,23 +140,14 @@ const groupedPhotos = computed(() => {
   return groups
 })
 
-// 优化的瀑布流分配算法 - 最短列优先
+// 优化的瀑布流分配算法 - 简单均匀分配
 function distributePhotos(photoList: Photo[]) {
   const cols: Photo[][] = Array.from({ length: columnCount.value }, () => [])
-  const colHeights: number[] = Array(columnCount.value).fill(0)
   
-  photoList.forEach(photo => {
-    // 计算图片高度（基于宽高比）
-    const [width, height] = photo.aspectRatio.split('/').map(Number)
-    const photoHeight = height / width
-    
-    // 找到当前最短的列
-    const minHeight = Math.min(...colHeights)
-    const minIndex = colHeights.indexOf(minHeight)
-    
-    // 将照片添加到最短的列
-    cols[minIndex].push(photo)
-    colHeights[minIndex] += photoHeight
+  photoList.forEach((photo, index) => {
+    // 简单轮询分配到各列
+    const colIndex = index % columnCount.value
+    cols[colIndex].push(photo)
   })
   
   return cols
@@ -174,7 +164,7 @@ function convertGalleryToPhoto(gallery: Gallery): Photo {
     title: gallery.title || '未命名',
     description: `${year}年${month}月 · ${gallery.category || '生活'}`,
     url: gallery.imageUrl,
-    aspectRatio: '4/3', // 默认宽高比
+    aspectRatio: 'auto', // 使用 auto 保持原始比例
     date: gallery.createdAt || new Date().toISOString(),
     caption: gallery.description
   }
@@ -398,6 +388,7 @@ onUnmounted(() => {
   width: 100%;
   height: auto;
   display: block;
+  object-fit: contain;
 }
 
 /* 图片信息区域 - 相纸底部 */

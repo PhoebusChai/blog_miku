@@ -24,3 +24,6 @@ export async function uploadFile(file: File): Promise<{ url: string; filename: s
 
   return response.data.data
 }
+
+// 别名导出
+export const uploadImage = uploadFile

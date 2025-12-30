@@ -112,6 +112,16 @@ export function getArticleHeatmap() {
 }
 
 /**
+ * 获取网站公开统计数据
+ */
+export function getPublicStats() {
+  return request<{ articles: number; views: number; likes: number; comments: number }>({
+    url: '/articles/stats/public',
+    method: 'get'
+  })
+}
+
+/**
  * 获取文章排行榜
  */
 export function getArticleRanking(limit: number = 10) {

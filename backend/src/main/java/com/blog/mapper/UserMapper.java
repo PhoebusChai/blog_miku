@@ -32,6 +32,9 @@ public interface UserMapper {
             "updated_at=NOW() WHERE id=#{id}")
     int update(User user);
 
+    @Update("UPDATE users SET password=#{password}, updated_at=NOW() WHERE id=#{id}")
+    int updatePassword(@Param("id") Integer id, @Param("password") String password);
+
     @Update("UPDATE users SET name=#{name}, avatar=#{avatar}, role=#{role}, status=#{status}, " +
             "updated_at=NOW() WHERE id=#{id}")
     int updateByAdmin(User user);

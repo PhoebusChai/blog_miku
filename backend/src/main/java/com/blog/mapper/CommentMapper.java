@@ -102,4 +102,10 @@ public interface CommentMapper {
         "</script>"
     })
     Long countByStatus(@Param("status") Integer status);
+    
+    /**
+     * 统计用户的评论数量
+     */
+    @Select("SELECT COUNT(*) FROM comments WHERE user_id = #{userId} AND status = 1")
+    int countByUserId(Integer userId);
 }

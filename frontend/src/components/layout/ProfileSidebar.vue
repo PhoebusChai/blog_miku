@@ -3,14 +3,14 @@
     <div class="user-card">
       <div class="avatar-wrapper">
         <img :src="user?.avatar" :alt="user?.name" class="user-avatar" />
-        <button class="avatar-edit">
+        <button class="avatar-edit" @click="$emit('update-avatar')">
           <Camera :size="14" />
         </button>
       </div>
       <div class="user-info">
         <h2 class="user-name">{{ user?.name }}</h2>
         <p class="user-email">{{ user?.email }}</p>
-        <span v-if="user?.role === 'admin'" class="user-badge">
+        <span v-if="user?.role === 1" class="user-badge">
           <Shield :size="12" />
           管理员
         </span>
@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { Camera, Shield, Settings, Activity, BookOpen } from 'lucide-vue-next'
+import { Camera, Shield, Settings, Activity, BookOpen, Heart, BookMarked } from 'lucide-vue-next'
 
 defineProps<{
   modelValue: string
@@ -42,6 +42,7 @@ defineProps<{
 
 defineEmits<{
   'update:modelValue': [value: string]
+  'update-avatar': []
 }>()
 
 const userStore = useUserStore()
@@ -50,7 +51,9 @@ const user = computed(() => userStore.user)
 const menuItems = [
   { id: 'account', label: '账户设置', icon: Settings },
   { id: 'activity', label: '我的活动', icon: Activity },
-  { id: 'reading', label: '阅读记录', icon: BookOpen }
+  { id: 'reading', label: '阅读记录', icon: BookOpen },
+  { id: 'likes', label: '我的点赞', icon: Heart },
+  { id: 'bookmarks', label: '我的收藏', icon: BookMarked }
 ]
 </script>
 

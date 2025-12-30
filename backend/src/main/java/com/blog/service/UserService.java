@@ -8,6 +8,8 @@ import com.blog.dto.RegisterDTO;
 import com.blog.dto.RegisterWithCodeDTO;
 import com.blog.entity.User;
 import com.blog.mapper.UserMapper;
+import com.blog.mapper.CommentMapper;
+import com.blog.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,8 @@ public class UserService {
 
     private final UserMapper userMapper;
     private final EmailService emailService;
+    private final CommentMapper commentMapper;
+    private final ReadingHistoryMapper readingHistoryMapper;
 
     public Map<String, Object> login(LoginDTO dto) {
         User user = userMapper.selectByEmail(dto.getEmail());
@@ -94,6 +98,45 @@ public class UserService {
 
     public User getUserById(Integer id) {
         return userMapper.selectById(id);
+    }
+
+    // ========== 个人中心功能 ==========
+
+    public User updateProfile(Integer userId, String name, String avatar) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (StrUtil.isNotBlank(name)) {
+            user.setName(name);
+        }
+        if (StrUtil.isNotBlank(avatar)) {
+            user.setAvatar(avatar);
+        }
+        userMapper.update(user);
+        return userMapper.selectById(userId);
+    }
+
+    public void changePassword(Integer userId, String oldPassword, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!BCrypt.checkpw(oldPassword, user.getPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+        if (StrUtil.isBlank(newPassword) || newPassword.length() < 6) {
+            throw new RuntimeException("新密码长度不能少于6位");
+        }
+        userMapper.updatePassword(userId, BCrypt.hashpw(newPassword));
+    }
+
+    public Map<String, Object> getUserActivity(Integer userId) {
+        Map<String, Object> activity = new HashMap<>();
+        activity.put("commentCount", commentMapper.countByUserId(userId));
+        activity.put("likeCount", readingHistoryMapper.countLikesByUserId(userId));
+        activity.put("bookmarkCount", readingHistoryMapper.countBookmarksByUserId(userId));
+        return activity;
     }
 
     // ========== 管理员功能 ==========

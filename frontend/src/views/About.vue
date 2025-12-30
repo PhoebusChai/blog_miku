@@ -18,44 +18,37 @@
         <section class="profile-section">
           <div class="profile-main">
             <div class="profile-avatar">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="头像" />
+              <img :src="configStore.bloggerAvatar" alt="头像" />
             </div>
             <div class="profile-info">
-              <h2 class="profile-name">落叶无痕</h2>
+              <h2 class="profile-name">{{ configStore.bloggerName }}</h2>
               <div class="profile-meta">
                 <span class="meta-item">
                   <Code :size="16" />
-                  全栈开发工程师
+                  {{ configStore.bloggerRole }}
                 </span>
                 <span class="meta-divider">·</span>
                 <span class="meta-item">
                   <MapPin :size="14" />
-                  中国 · 北京
+                  {{ configStore.bloggerLocation || '中国' }}
                 </span>
               </div>
             </div>
           </div>
 
           <div class="profile-bio">
-            <p>
-              热爱编程，喜欢探索新技术。专注于前端开发，对用户体验和界面设计有着浓厚的兴趣。
-              相信技术能够改变世界，代码可以创造美好。
-            </p>
-            <p>
-              工作之余喜欢写博客分享技术心得，记录生活点滴。
-              希望通过这个小站，能与更多志同道合的朋友交流学习。
-            </p>
+            <p>{{ configStore.bloggerBio }}</p>
           </div>
 
           <!-- 社交链接 -->
           <div class="profile-social">
-            <a href="https://github.com" target="_blank" class="social-link" title="GitHub">
+            <a v-if="configStore.socialGithub" :href="configStore.socialGithub" target="_blank" class="social-link" title="GitHub">
               <Github :size="18" />
             </a>
-            <a href="mailto:contact@example.com" class="social-link" title="Email">
+            <a v-if="configStore.socialEmail" :href="'mailto:' + configStore.socialEmail" class="social-link" title="Email">
               <Mail :size="18" />
             </a>
-            <a href="https://space.bilibili.com" target="_blank" class="social-link" title="哔哩哔哩">
+            <a v-if="configStore.socialBilibili" :href="configStore.socialBilibili" target="_blank" class="social-link" title="哔哩哔哩">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.658.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373Z"/>
               </svg>
@@ -65,22 +58,22 @@
           <!-- 统计数据 -->
           <div class="profile-stats">
             <div class="stat-item">
-              <span class="stat-value">42</span>
+              <span class="stat-value">{{ formatNumber(stats.articles) }}</span>
               <span class="stat-label">文章</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-value">12.5K</span>
+              <span class="stat-value">{{ formatNumber(stats.views) }}</span>
               <span class="stat-label">访问</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-value">856</span>
+              <span class="stat-value">{{ formatNumber(stats.likes) }}</span>
               <span class="stat-label">点赞</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-value">234</span>
+              <span class="stat-value">{{ formatNumber(stats.comments) }}</span>
               <span class="stat-label">评论</span>
             </div>
           </div>
@@ -98,7 +91,7 @@
         </section>
 
         <!-- 时间线 -->
-        <section class="content-section">
+        <!-- <section class="content-section">
           <h3 class="section-title">成长历程</h3>
           <div class="timeline">
             <div v-for="(item, index) in timeline" :key="index" class="timeline-item">
@@ -112,7 +105,7 @@
               </div>
             </div>
           </div>
-        </section>
+        </section> -->
 
         <!-- 联系方式 -->
         <section class="content-section">
@@ -121,13 +114,13 @@
             如果你有任何问题或建议，欢迎通过以下方式联系我。期待与你的交流！
           </p>
           <div class="contact-list">
-            <a href="mailto:contact@example.com" class="contact-link">
+            <a v-if="configStore.socialEmail" :href="'mailto:' + configStore.socialEmail" class="contact-link">
               <Mail :size="20" />
-              <span>contact@example.com</span>
+              <span>{{ configStore.socialEmail }}</span>
             </a>
-            <a href="https://github.com" target="_blank" class="contact-link">
+            <a v-if="configStore.socialGithub" :href="configStore.socialGithub" target="_blank" class="contact-link">
               <Github :size="20" />
-              <span>@username</span>
+              <span>{{ configStore.socialGithub.replace('https://github.com/', '@') }}</span>
             </a>
           </div>
         </section>
@@ -151,51 +144,63 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { 
-  Code, MapPin, Github, Mail, 
-  FileText, Eye, Heart, MessageCircle, 
-  Calendar, Send, ArrowUp, Camera, Music, 
-  Book, Gamepad2, Plane, Sparkles
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import {
+  Code,
+  MapPin,
+  Github,
+  Mail,
+  ArrowUp,
+  Camera,
+  Music,
+  Book,
+  Gamepad2,
+  Plane,
+  Sparkles
 } from 'lucide-vue-next'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import { useConfigStore } from '@/stores/config'
+import { getPublicStats } from '@/api/article'
 
+const configStore = useConfigStore()
 const showBackToTop = ref(false)
 
-// 兴趣爱好
-const interests = ref([
-  { name: '编程', icon: Code },
-  { name: '摄影', icon: Camera },
-  { name: '音乐', icon: Music },
-  { name: '阅读', icon: Book },
-  { name: '游戏', icon: Gamepad2 },
-  { name: '旅行', icon: Plane }
-])
+// 统计数据
+const stats = ref({
+  articles: 0,
+  views: 0,
+  likes: 0,
+  comments: 0
+})
 
-// 时间线数据
-const timeline = ref([
-  {
-    date: '2024',
-    title: '全栈开发工程师',
-    desc: '专注于前端技术栈，探索现代化开发方式'
-  },
-  {
-    date: '2023',
-    title: '开始写博客',
-    desc: '创建个人技术博客，分享学习心得'
-  },
-  {
-    date: '2022',
-    title: '前端开发工程师',
-    desc: '深入学习 Vue.js 和 React 生态'
-  },
-  {
-    date: '2021',
-    title: '开始学习编程',
-    desc: '接触前端开发，开启技术之旅'
+// 格式化数字
+function formatNumber(num: number): string {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'W'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
   }
-])
+  return num.toString()
+}
+
+// 兴趣爱好图标映射
+const interestIconMap: Record<string, any> = {
+  编程: Code,
+  摄影: Camera,
+  音乐: Music,
+  阅读: Book,
+  游戏: Gamepad2,
+  旅行: Plane
+}
+
+// 从配置中获取兴趣爱好
+const interests = computed(() => {
+  return configStore.bloggerInterests.map((name) => ({
+    name,
+    icon: interestIconMap[name] || Code
+  }))
+})
 
 // 滚动处理
 function handleScroll() {
@@ -209,8 +214,19 @@ function scrollToTop() {
   })
 }
 
+// 加载统计数据
+async function loadStats() {
+  try {
+    const data = await getPublicStats()
+    stats.value = data
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  loadStats()
 })
 
 onUnmounted(() => {

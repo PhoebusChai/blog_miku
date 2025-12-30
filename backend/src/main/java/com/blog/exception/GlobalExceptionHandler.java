@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotPermissionException.class)
     public Result<Void> handleNotPermissionException(NotPermissionException e) {
         return Result.error(403, "无此操作权限");
+    }
+    
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.debug("资源不存在：{}", e.getResourcePath());
+        return Result.error(404, "资源不存在");
     }
     
     @ExceptionHandler(BindException.class)
